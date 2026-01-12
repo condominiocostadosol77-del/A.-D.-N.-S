@@ -10,7 +10,13 @@ import {
   Camera,
   AlertTriangle,
   MapPin,
-  Printer
+  Printer,
+  Eye,
+  Calendar,
+  Phone,
+  Mail,
+  Home,
+  Droplets
 } from 'lucide-react';
 import { Member, Role, Sector } from '../types';
 import * as storage from '../services/storage';
@@ -23,8 +29,11 @@ interface MembersProps {
 const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [viewingMember, setViewingMember] = useState<Member | null>(null);
   
   // State for Delete Confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -39,6 +48,13 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   // Helper to get Sector Name
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
+  };
+
+  // Helper to format Date
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   // Update default form sector if global sector changes
@@ -210,7 +226,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMembers.map((member) => (
           <div key={member.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
-            <div className="p-6 flex items-start gap-4">
+            <div className="p-6 flex items-start gap-4 cursor-pointer" onClick={() => setViewingMember(member)}>
               <div className="flex-shrink-0">
                 {member.photoUrl ? (
                   <img src={member.photoUrl} alt={member.fullName} className="w-16 h-16 rounded-full object-cover border-2 border-emerald-100" />
@@ -250,8 +266,15 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
               </div>
               <div className="flex gap-2">
                 <button 
+                  onClick={() => setViewingMember(member)}
+                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                  title="Ver Detalhes"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button 
                   onClick={() => handleEdit(member)} 
-                  className="p-2 text-slate-500 hover:text-emerald-600 transition-colors"
+                  className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
                   title="Editar"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -267,7 +290,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
             </div>
             {/* Show tither status for print only */}
             <div className="hidden print:block px-6 pb-2 text-xs text-gray-500">
-                 {member.isTither ? 'Dizimista' : 'Não Dizimista'} | Batismo: {member.baptismDate ? new Date(member.baptismDate).toLocaleDateString() : '-'}
+                 {member.isTither ? 'Dizimista' : 'Não Dizimista'} | Batismo: {member.baptismDate ? formatDate(member.baptismDate) : '-'}
             </div>
           </div>
         ))}
@@ -298,6 +321,100 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                 className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 shadow-sm"
               >
                 Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {viewingMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+              <h3 className="text-lg font-bold text-slate-800">Detalhes do Membro</h3>
+              <button 
+                onClick={() => setViewingMember(null)} 
+                className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex flex-col items-center mb-8">
+                 <div className="w-24 h-24 rounded-full border-4 border-emerald-100 overflow-hidden mb-4 shadow-sm">
+                    {viewingMember.photoUrl ? (
+                      <img src={viewingMember.photoUrl} alt={viewingMember.fullName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                        <User className="w-10 h-10 text-slate-300" />
+                      </div>
+                    )}
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-800 text-center">{viewingMember.fullName}</h2>
+                 <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium mt-2">
+                    {viewingMember.role}
+                 </span>
+              </div>
+
+              <div className="space-y-4">
+                 {/* Contact Info */}
+                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Contato e Endereço</h4>
+                    <div className="flex items-center gap-3">
+                       <Mail className="w-4 h-4 text-emerald-600" />
+                       <span className="text-slate-700 text-sm">{viewingMember.email}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <Phone className="w-4 h-4 text-emerald-600" />
+                       <span className="text-slate-700 text-sm">{viewingMember.phone || 'Não informado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <Home className="w-4 h-4 text-emerald-600" />
+                       <span className="text-slate-700 text-sm">{viewingMember.address || 'Não informado'}</span>
+                    </div>
+                 </div>
+
+                 {/* Church Info */}
+                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Dados Eclesiásticos</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Congregação</p>
+                          <p className="text-sm font-medium text-slate-800">{getSectorName(viewingMember.sector)}</p>
+                       </div>
+                       <div>
+                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Nascimento</p>
+                          <p className="text-sm font-medium text-slate-800">{formatDate(viewingMember.birthDate)}</p>
+                       </div>
+                       <div>
+                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Droplets className="w-3 h-3" /> Batismo</p>
+                          <p className="text-sm font-medium text-slate-800">{formatDate(viewingMember.baptismDate)}</p>
+                       </div>
+                       <div>
+                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Check className="w-3 h-3" /> Dizimista</p>
+                          <p className={`text-sm font-medium ${viewingMember.isTither ? 'text-emerald-600' : 'text-slate-500'}`}>
+                             {viewingMember.isTither ? 'Sim' : 'Não'}
+                          </p>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="text-center pt-2">
+                    <p className="text-xs text-slate-400">
+                       Cadastrado em {new Date(viewingMember.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                 </div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button 
+                onClick={() => setViewingMember(null)}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium text-sm"
+              >
+                Fechar Detalhes
               </button>
             </div>
           </div>

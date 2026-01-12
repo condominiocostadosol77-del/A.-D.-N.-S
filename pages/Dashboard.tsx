@@ -21,7 +21,8 @@ import {
   FileText,
   CreditCard,
   MapPin,
-  Printer
+  Printer,
+  Calendar
 } from 'lucide-react';
 import { Member, Transaction, TransactionType, PaymentMethod, Sector } from '../types';
 import * as storage from '../services/storage';
@@ -126,6 +127,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
   const unpaidTithers = tithers.filter(m => !paidTitherIds.has(m.id));
 
   // --- Charts Data ---
+  
+  // 1. Expense By Category
   const expenseByCategory = currentMonthTransactions
     .filter(t => t.type === TransactionType.EXPENSE)
     .reduce((acc, t) => {
@@ -136,6 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
 
   const pieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
 
+  // 2. Monthly Evolution (Macro View)
   const monthlyEvolution = [0, 1, 2, 3, 4, 5].map(i => {
     let targetMonth = currentMonth - (5 - i);
     let targetYear = currentYear;
@@ -163,6 +167,33 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
       name: `${targetMonth + 1}/${targetYear}`,
       Receitas: income,
       Despesas: expense
+    };
+  });
+
+  // 3. Daily Evolution (Micro View - Current Month)
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+  
+  const dailyEvolution = Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    // Find transactions for this specific day
+    const dayTxs = currentMonthTransactions.filter(t => {
+      const [y, m, d] = t.date.split('-').map(Number);
+      return d === day;
+    });
+
+    const income = dayTxs
+      .filter(t => t.type !== TransactionType.EXPENSE)
+      .reduce((s, t) => s + t.amount, 0);
+
+    const expense = dayTxs
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((s, t) => s + t.amount, 0);
+
+    return {
+        name: `${day}`,
+        Receitas: income,
+        Despesas: expense
     };
   });
 
@@ -276,10 +307,35 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
+      {/* Daily Chart Section (New) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
+        <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-slate-800">Fluxo Diário (Mês Atual)</h3>
+        </div>
+        <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={dailyEvolution}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
+            <Tooltip 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                formatter={(val: number) => `R$ ${val.toLocaleString()}`}
+                labelFormatter={(label) => `Dia ${label}`}
+            />
+            <Legend />
+            <Bar dataKey="Receitas" fill="#10b981" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Despesas" fill="#ef4444" radius={[2, 2, 0, 0]} />
+            </BarChart>
+        </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Evolução Financeira (6 Meses)</h3>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Evolução Financeira (Últimos 6 Meses)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyEvolution}>

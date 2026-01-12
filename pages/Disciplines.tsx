@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Gavel, 
   Plus, 
@@ -9,7 +9,8 @@ import {
   User,
   CheckCircle2,
   X,
-  Printer
+  Printer,
+  ChevronDown
 } from 'lucide-react';
 import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
@@ -33,12 +34,26 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     startDate: new Date().toISOString().split('T')[0],
   });
 
+  // Smart Search States for Modal
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [showMemberSuggestions, setShowMemberSuggestions] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
   };
 
   useEffect(() => {
     loadData();
+    
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowMemberSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadData = async () => {
@@ -53,7 +68,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.memberId || !formData.reason || !formData.startDate || !formData.endDate) {
-      alert('Preencha todos os campos obrigatórios');
+      alert('Preencha todos os campos obrigatórios e selecione um membro válido.');
       return;
     }
 
@@ -70,9 +85,15 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     };
 
     await storage.saveDiscipline(newDiscipline);
+    closeModal();
+    loadData();
+  };
+
+  const closeModal = () => {
     setIsModalOpen(false);
     setFormData({ startDate: new Date().toISOString().split('T')[0] });
-    loadData();
+    setMemberSearchQuery('');
+    setShowMemberSuggestions(false);
   };
 
   const confirmDelete = async () => {
@@ -98,7 +119,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     return end >= now;
   };
 
-  // Filter based on Sector AND Search
+  // Filter based on Sector AND Search (Main List)
   const filteredDisciplines = disciplines
     .filter(d => currentSector === 'ALL' || d.sector === currentSector)
     .filter(d => {
@@ -112,8 +133,18 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
       );
     });
 
-  // Only allow selecting members from the current view sector context (unless ALL)
+  // Filter members for the modal dropdown
   const availableMembers = members.filter(m => currentSector === 'ALL' || m.sector === currentSector);
+  
+  const filteredModalMembers = availableMembers.filter(m => 
+    m.fullName.toLowerCase().includes(memberSearchQuery.toLowerCase())
+  );
+
+  const handleSelectMember = (member: Member) => {
+    setFormData({ ...formData, memberId: member.id });
+    setMemberSearchQuery(member.fullName);
+    setShowMemberSuggestions(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -289,25 +320,69 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl">
               <h3 className="text-xl font-bold text-slate-800">Nova Disciplina</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <X className="w-6 h-6" />
               </button>
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-4">
-              <div>
+              
+              {/* Smart Search Dropdown */}
+              <div className="relative" ref={dropdownRef}>
                  <label className="block text-sm font-medium text-slate-700 mb-1">Membro</label>
-                 <select 
-                  required 
-                  className="w-full p-2 border rounded-lg focus:ring-emerald-500"
-                  value={formData.memberId || ''} 
-                  onChange={e => setFormData({...formData, memberId: e.target.value})}
-                 >
-                   <option value="">Selecione o membro...</option>
-                   {availableMembers.map(m => (
-                     <option key={m.id} value={m.id}>{m.fullName} ({getSectorName(m.sector)})</option>
-                   ))}
-                 </select>
+                 <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 outline-none ${!formData.memberId ? 'border-slate-300' : 'border-emerald-500 bg-emerald-50'}`}
+                      placeholder="Digite o nome do membro..."
+                      value={memberSearchQuery}
+                      onChange={(e) => {
+                        setMemberSearchQuery(e.target.value);
+                        setFormData({ ...formData, memberId: '' }); // Clear selection on type
+                        setShowMemberSuggestions(true);
+                      }}
+                      onFocus={() => setShowMemberSuggestions(true)}
+                    />
+                    {formData.memberId && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    )}
+                 </div>
+                 
+                 {showMemberSuggestions && (
+                   <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                     {filteredModalMembers.length > 0 ? (
+                       <ul>
+                         {filteredModalMembers.map(member => (
+                           <li 
+                             key={member.id}
+                             className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-0"
+                             onClick={() => handleSelectMember(member)}
+                           >
+                             <div>
+                               <p className="text-sm font-medium text-slate-700">{member.fullName}</p>
+                               <p className="text-xs text-slate-500">{getSectorName(member.sector)}</p>
+                             </div>
+                             {member.id === formData.memberId && (
+                               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                             )}
+                           </li>
+                         ))}
+                       </ul>
+                     ) : (
+                       <div className="p-4 text-center text-sm text-slate-500">
+                         Nenhum membro encontrado.
+                       </div>
+                     )}
+                   </div>
+                 )}
+                 {formData.memberId && !showMemberSuggestions && (
+                   <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                     <CheckCircle2 className="w-3 h-3" /> Membro selecionado
+                   </p>
+                 )}
               </div>
 
               <div>

@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Sector } from '../types';
+import { Sector, User } from '../types';
 import * as storage from '../services/storage';
-import { Save, Plus, Trash2, MapPin, Settings as SettingsIcon, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, Plus, Trash2, MapPin, Settings as SettingsIcon, CheckCircle, AlertCircle, Users, Shield, AlertTriangle } from 'lucide-react';
 
 interface SettingsProps {
   sectors: Sector[];
   onUpdateSectors: (newSectors: Sector[]) => void;
+  currentUserEmail: string;
 }
 
-const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors }) => {
+const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors, currentUserEmail }) => {
   const [localSectors, setLocalSectors] = useState<Sector[]>([]);
   const [newSectorName, setNewSectorName] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
   const [statusMessage, setStatusMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   // Initialize local state
   useEffect(() => {
+    loadData();
+  }, [sectors]);
+
+  const loadData = async () => {
     if (sectors.length > 0) {
         setLocalSectors(JSON.parse(JSON.stringify(sectors)));
     }
-  }, [sectors]);
+    const loadedUsers = await storage.getUsers();
+    setUsers(loadedUsers);
+  };
 
   const handleNameChange = (id: string, newName: string) => {
     setLocalSectors(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
@@ -41,10 +50,31 @@ const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors }) => {
       setTimeout(() => setStatusMessage(null), 3000);
       return;
     }
-    
-    // Remove immediately from UI (Optimistic UI)
-    // No need for confirm dialog here as changes are only persisted on "Save"
     setLocalSectors(prev => prev.filter(s => s.id !== id));
+  };
+
+  const initiateDeleteUser = (email: string) => {
+     if (email === currentUserEmail) {
+        setStatusMessage({ type: 'error', text: 'Você não pode excluir seu próprio usuário.' });
+        setTimeout(() => setStatusMessage(null), 3000);
+        return;
+     }
+     setUserToDelete(email);
+  };
+
+  const confirmDeleteUser = async () => {
+     if (!userToDelete) return;
+
+     try {
+        await storage.deleteUser(userToDelete);
+        setUsers(prev => prev.filter(u => u.email !== userToDelete));
+        setStatusMessage({ type: 'success', text: 'Administrador removido com sucesso.' });
+     } catch (error) {
+        setStatusMessage({ type: 'error', text: 'Erro ao remover administrador.' });
+     } finally {
+        setUserToDelete(null);
+        setTimeout(() => setStatusMessage(null), 3000);
+     }
   };
 
   const handleSave = async () => {
@@ -74,7 +104,7 @@ const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors }) => {
             </div>
             <div>
                 <h2 className="text-2xl font-bold text-slate-800">Configurações do Sistema</h2>
-                <p className="text-slate-500">Gerencie as filiais e congregações da igreja.</p>
+                <p className="text-slate-500">Gerencie as filiais e administradores da igreja.</p>
             </div>
         </div>
       </div>
@@ -89,6 +119,7 @@ const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors }) => {
         </div>
       )}
 
+      {/* Sectors Management */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -169,6 +200,84 @@ const Settings: React.FC<SettingsProps> = ({ sectors, onUpdateSectors }) => {
             </button>
         </div>
       </div>
+
+      {/* Admin Management */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-emerald-600" />
+            Gerenciar Administradores
+          </h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Contas com acesso administrativo ao sistema.
+          </p>
+        </div>
+        <div className="p-6">
+            <div className="space-y-3">
+                {users.map((user) => (
+                    <div key={user.email} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-slate-200 p-2 rounded-full">
+                                <Users className="w-5 h-5 text-slate-500" />
+                            </div>
+                            <div>
+                                <p className="font-medium text-slate-800">{user.name}</p>
+                                <p className="text-xs text-slate-500">{user.email}</p>
+                            </div>
+                        </div>
+                        {user.email !== currentUserEmail ? (
+                            <button 
+                                type="button"
+                                onClick={() => initiateDeleteUser(user.email)}
+                                className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                title="Remover acesso deste administrador"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
+                                Você
+                            </span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold">Remover Admin</h3>
+            </div>
+            <p className="text-slate-600 mb-6">
+              Tem certeza que deseja remover este administrador? Ele perderá o acesso ao sistema imediatamente.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button 
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={confirmDeleteUser}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 shadow-sm"
+              >
+                Sim, Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

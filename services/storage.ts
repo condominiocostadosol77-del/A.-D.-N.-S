@@ -42,6 +42,27 @@ export const loginUser = async (email: string, password: string): Promise<User |
   return null;
 };
 
+export const getUsers = async (): Promise<User[]> => {
+  await delay(300);
+  const usersStr = localStorage.getItem(USERS_KEY);
+  if (!usersStr) return [];
+  const users = JSON.parse(usersStr);
+  // Return users without passwords
+  return users.map((u: any) => {
+    const { password: _, ...safeUser } = u;
+    return safeUser;
+  });
+};
+
+export const deleteUser = async (email: string): Promise<void> => {
+  await delay(300);
+  const usersStr = localStorage.getItem(USERS_KEY);
+  if (!usersStr) return;
+  const users = JSON.parse(usersStr);
+  const newUsers = users.filter((u: any) => u.email !== email);
+  localStorage.setItem(USERS_KEY, JSON.stringify(newUsers));
+};
+
 // --- Sectors CRUD ---
 
 export const getSectors = async (): Promise<Sector[]> => {
