@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A. D. NATIVIDADE DA SERRA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      /* Custom scrollbar for cleaner look */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #f1f5f9; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      /* --- PRINT STYLES FOR PDF GENERATION --- */
+      @media print {
+        /* Hide UI elements non-essential for reports */
+        aside, 
+        button, 
+        input, 
+        select, 
+        .no-print, 
+        .fixed, 
+        nav,
+        .md\:hidden { 
+          display: none !important; 
+        }
+
+        /* Reset layout for A4 paper */
+        body, #root, main {
+          background-color: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          overflow: visible !important;
+          font-size: 12pt;
+          color: black !important;
+        }
+
+        main {
+          margin-left: 0 !important;
+          max-width: 100% !important;
+        }
+
+        /* Improve Table Visibility */
+        table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          margin-top: 20px;
+        }
+        
+        th, td {
+          border: 1px solid #ddd !important;
+          padding: 8px !important;
+          text-align: left;
+        }
+
+        thead {
+          background-color: #f3f4f6 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        /* Hide specific columns like "Actions" (usually last child) */
+        th:last-child, td:last-child {
+          display: none;
+        }
+
+        /* Card Layouts to List for Printing (Members) */
+        .grid {
+          display: block !important;
+        }
+        .grid > div {
+          break-inside: avoid;
+          border: 1px solid #eee;
+          margin-bottom: 10px;
+          page-break-inside: avoid;
+        }
+
+        /* Header for Print */
+        .print-header {
+          display: block !important;
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #000;
+          padding-bottom: 10px;
+        }
+        
+        /* Ensure charts don't break awkwardly */
+        .recharts-responsive-container {
+          height: 300px !important;
+        }
+      }
+      
+      .print-header { display: none; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-50 text-slate-800 antialiased">
+    <div id="root"></div>
+  </body>
+</html>

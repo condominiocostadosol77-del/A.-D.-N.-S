@@ -1,0 +1,8 @@
+{
+  "name": "A. D. NATIVIDADE DA SERRA",
+  "description": "Sistema completo de gestão para igrejas: Membros, Dízimos, Ofertas e Relatórios Financeiros.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
