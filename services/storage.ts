@@ -1,239 +1,292 @@
-import { Member, Transaction, TransactionType, User, Sector, Discipline } from '../types';
+import { Member, Transaction, User, Sector, Discipline } from '../types';
+import { supabase } from './supabase';
 
-// Keys for LocalStorage
-const MEMBERS_KEY = 'ecclesia_members';
-const TRANSACTIONS_KEY = 'ecclesia_transactions';
-const USERS_KEY = 'ecclesia_users';
-const SECTORS_KEY = 'ecclesia_sectors';
-const DISCIPLINES_KEY = 'ecclesia_disciplines';
+// --- Helpers for Type Mapping ---
 
-// Simulation of a delay to mimic network requests
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Mapper function to convert snake_case DB fields to camelCase TS interfaces
+const mapMemberFromDB = (m: any): Member => ({
+  id: m.id,
+  fullName: m.full_name,
+  birthDate: m.birth_date,
+  phone: m.phone,
+  email: m.email,
+  address: m.address,
+  baptismDate: m.baptism_date,
+  role: m.role,
+  isTither: m.is_tither,
+  sector: m.sector || 'SEDE',
+  photoUrl: m.photo_url,
+  createdAt: m.created_at
+});
+
+const mapMemberToDB = (m: Member) => ({
+  id: m.id,
+  full_name: m.fullName,
+  birth_date: m.birthDate,
+  phone: m.phone,
+  email: m.email,
+  address: m.address,
+  baptism_date: m.baptismDate,
+  role: m.role,
+  is_tither: m.isTither,
+  sector: m.sector,
+  photo_url: m.photoUrl,
+  created_at: m.createdAt
+});
+
+const mapTransactionFromDB = (t: any): Transaction => ({
+  id: t.id,
+  type: t.type,
+  date: t.date,
+  amount: t.amount,
+  memberId: t.member_id,
+  description: t.description,
+  category: t.category,
+  receiptUrl: t.receipt_url,
+  paymentMethod: t.payment_method,
+  pixDestination: t.pix_destination,
+  sector: t.sector || 'SEDE',
+  responsible: t.responsible,
+  createdAt: t.created_at
+});
+
+const mapTransactionToDB = (t: Transaction) => ({
+  id: t.id,
+  type: t.type,
+  date: t.date,
+  amount: t.amount,
+  member_id: t.memberId,
+  description: t.description,
+  category: t.category,
+  receipt_url: t.receiptUrl,
+  payment_method: t.paymentMethod,
+  pix_destination: t.pixDestination,
+  sector: t.sector,
+  created_at: t.createdAt
+});
+
+const mapDisciplineFromDB = (d: any): Discipline => ({
+    id: d.id,
+    memberId: d.member_id,
+    reason: d.reason,
+    startDate: d.start_date,
+    endDate: d.end_date,
+    sector: d.sector,
+    createdAt: d.created_at
+});
+
+const mapDisciplineToDB = (d: Discipline) => ({
+    id: d.id,
+    member_id: d.memberId,
+    reason: d.reason,
+    start_date: d.startDate,
+    end_date: d.endDate,
+    sector: d.sector,
+    created_at: d.createdAt
+});
 
 // --- Auth & Users ---
 
 export const registerUser = async (user: User & { password: string }): Promise<boolean> => {
-  await delay(500);
-  const usersStr = localStorage.getItem(USERS_KEY);
-  const users = usersStr ? JSON.parse(usersStr) : [];
-  
-  // Check if email already exists
-  if (users.find((u: any) => u.email === user.email)) {
+  try {
+    // 1. Create Auth User
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: user.email,
+      password: user.password,
+    });
+
+    if (authError || !authData.user) {
+      console.error('Auth Error:', authError);
+      return false;
+    }
+
+    // 2. Create Public Profile
+    const { error: profileError } = await supabase.from('app_users').insert({
+      id: authData.user.id,
+      email: user.email,
+      name: user.name
+    });
+
+    if (profileError) {
+      console.error('Profile Error:', profileError);
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.error(e);
     return false;
   }
-  
-  users.push(user);
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  return true;
 };
 
 export const loginUser = async (email: string, password: string): Promise<User | null> => {
-  await delay(500);
-  const usersStr = localStorage.getItem(USERS_KEY);
-  const users = usersStr ? JSON.parse(usersStr) : [];
-  
-  const user = users.find((u: any) => u.email === email && u.password === password);
-  
-  if (user) {
-    // Return user without password
-    const { password: _, ...safeUser } = user;
-    return safeUser;
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error || !data.user) return null;
+
+    // Get user profile for the name
+    const { data: profile } = await supabase
+      .from('app_users')
+      .select('name')
+      .eq('id', data.user.id)
+      .single();
+
+    return {
+      email: data.user.email || email,
+      name: profile?.name || 'Administrador'
+    };
+  } catch (e) {
+    console.error(e);
+    return null;
   }
-  return null;
 };
 
+export const logoutUser = async () => {
+    await supabase.auth.signOut();
+}
+
+export const getCurrentSession = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+}
+
 export const getUsers = async (): Promise<User[]> => {
-  await delay(300);
-  const usersStr = localStorage.getItem(USERS_KEY);
-  if (!usersStr) return [];
-  const users = JSON.parse(usersStr);
-  // Return users without passwords
-  return users.map((u: any) => {
-    const { password: _, ...safeUser } = u;
-    return safeUser;
-  });
+  const { data, error } = await supabase.from('app_users').select('*');
+  if (error) {
+      console.error(error);
+      return [];
+  }
+  return data.map((u: any) => ({
+    email: u.email,
+    name: u.name
+  }));
 };
 
 export const deleteUser = async (email: string): Promise<void> => {
-  await delay(300);
-  const usersStr = localStorage.getItem(USERS_KEY);
-  if (!usersStr) return;
-  const users = JSON.parse(usersStr);
-  const newUsers = users.filter((u: any) => u.email !== email);
-  localStorage.setItem(USERS_KEY, JSON.stringify(newUsers));
+  // Nota: Deletar usuário do Supabase Auth exige Service Role Key (backend).
+  // Do client-side, podemos apenas remover da tabela 'app_users', o que remove acesso visual,
+  // mas o login ainda funcionaria. Para uma app completa, isso deveria ser uma Edge Function.
+  // Por enquanto, deletaremos da tabela de referência.
+  await supabase.from('app_users').delete().eq('email', email);
 };
 
 // --- Sectors CRUD ---
 
 export const getSectors = async (): Promise<Sector[]> => {
-  // No delay here for UI responsiveness on load
-  const data = localStorage.getItem(SECTORS_KEY);
-  if (!data) return [];
-  return JSON.parse(data);
+  const { data, error } = await supabase.from('sectors').select('*');
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data;
 };
 
 export const saveSectors = async (sectors: Sector[]): Promise<void> => {
-  localStorage.setItem(SECTORS_KEY, JSON.stringify(sectors));
+  // Upsert all sectors
+  const { error } = await supabase.from('sectors').upsert(sectors);
+  if (error) console.error(error);
 };
 
 // --- Members CRUD ---
 
 export const getMembers = async (): Promise<Member[]> => {
-  await delay(300);
-  const data = localStorage.getItem(MEMBERS_KEY);
-  // Migration fallback: if sector is missing, default to SEDE
-  const members = data ? JSON.parse(data) : [];
-  return members.map((m: any) => ({ ...m, sector: m.sector || 'SEDE' }));
+  const { data, error } = await supabase.from('members').select('*');
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data.map(mapMemberFromDB);
 };
 
 export const saveMember = async (member: Member): Promise<Member> => {
-  await delay(300);
-  const members = await getMembers();
-  const existingIndex = members.findIndex(m => m.id === member.id);
-  
-  let newMembers;
-  if (existingIndex >= 0) {
-    newMembers = [...members];
-    newMembers[existingIndex] = member;
-  } else {
-    newMembers = [...members, member];
+  const dbMember = mapMemberToDB(member);
+  const { error } = await supabase.from('members').upsert(dbMember);
+  if (error) {
+      console.error(error);
+      throw error;
   }
-  
-  localStorage.setItem(MEMBERS_KEY, JSON.stringify(newMembers));
   return member;
 };
 
 export const deleteMember = async (id: string): Promise<void> => {
-  await delay(300);
-  const members = await getMembers();
-  const newMembers = members.filter(m => m.id !== id);
-  localStorage.setItem(MEMBERS_KEY, JSON.stringify(newMembers));
+  const { error } = await supabase.from('members').delete().eq('id', id);
+  if (error) console.error(error);
 };
 
 // --- Disciplines CRUD ---
 
 export const getDisciplines = async (): Promise<Discipline[]> => {
-  await delay(300);
-  const data = localStorage.getItem(DISCIPLINES_KEY);
-  return data ? JSON.parse(data) : [];
+  const { data, error } = await supabase.from('disciplines').select('*');
+  if (error) {
+      console.error(error);
+      return [];
+  }
+  return data.map(mapDisciplineFromDB);
 };
 
 export const saveDiscipline = async (discipline: Discipline): Promise<Discipline> => {
-  await delay(300);
-  const disciplines = await getDisciplines();
-  const existingIndex = disciplines.findIndex(d => d.id === discipline.id);
-
-  let newDisciplines;
-  if (existingIndex >= 0) {
-    newDisciplines = [...disciplines];
-    newDisciplines[existingIndex] = discipline;
-  } else {
-    newDisciplines = [...disciplines, discipline];
+  const dbDisc = mapDisciplineToDB(discipline);
+  const { error } = await supabase.from('disciplines').upsert(dbDisc);
+  if (error) {
+      console.error(error);
+      throw error;
   }
-
-  localStorage.setItem(DISCIPLINES_KEY, JSON.stringify(newDisciplines));
   return discipline;
 };
 
 export const deleteDiscipline = async (id: string): Promise<void> => {
-  await delay(300);
-  const disciplines = await getDisciplines();
-  const newDisciplines = disciplines.filter(d => d.id !== id);
-  localStorage.setItem(DISCIPLINES_KEY, JSON.stringify(newDisciplines));
+  const { error } = await supabase.from('disciplines').delete().eq('id', id);
+  if (error) console.error(error);
 };
 
 // --- Transactions CRUD ---
 
 export const getTransactions = async (): Promise<Transaction[]> => {
-  await delay(300);
-  const data = localStorage.getItem(TRANSACTIONS_KEY);
-  // Migration fallback
-  const txs = data ? JSON.parse(data) : [];
-  return txs.map((t: any) => ({ ...t, sector: t.sector || 'SEDE' }));
+  const { data, error } = await supabase.from('transactions').select('*');
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data.map(mapTransactionFromDB);
 };
 
 export const saveTransaction = async (transaction: Transaction): Promise<Transaction> => {
-  await delay(300);
-  const transactions = await getTransactions();
-  const existingIndex = transactions.findIndex(t => t.id === transaction.id);
-
-  let newTransactions;
-  if (existingIndex >= 0) {
-    newTransactions = [...transactions];
-    newTransactions[existingIndex] = transaction;
-  } else {
-    newTransactions = [...transactions, transaction];
+  const dbTx = mapTransactionToDB(transaction);
+  const { error } = await supabase.from('transactions').upsert(dbTx);
+  if (error) {
+      console.error(error);
+      throw error;
   }
-
-  localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(newTransactions));
   return transaction;
 };
 
 export const deleteTransaction = async (id: string): Promise<void> => {
-  await delay(300);
-  const transactions = await getTransactions();
-  const newTransactions = transactions.filter(t => t.id !== id);
-  localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(newTransactions));
+  const { error } = await supabase.from('transactions').delete().eq('id', id);
+  if (error) console.error(error);
 };
 
 // --- Helpers ---
 
 export const getMemberById = async (id: string): Promise<Member | undefined> => {
-  const members = await getMembers();
-  return members.find(m => m.id === id);
+  const { data, error } = await supabase.from('members').select('*').eq('id', id).single();
+  if (error || !data) return undefined;
+  return mapMemberFromDB(data);
 };
 
-export const seedDatabase = () => {
-  // Seed Sectors
-  if (!localStorage.getItem(SECTORS_KEY)) {
+export const seedDatabase = async () => {
+  // Check if sectors exist
+  const sectors = await getSectors();
+  if (sectors.length === 0) {
     const defaultSectors: Sector[] = [
       { id: 'SEDE', name: 'Sede Principal' },
       { id: 'SETOR_1', name: 'Setor 1' },
       { id: 'SETOR_2', name: 'Setor 2' }
     ];
-    localStorage.setItem(SECTORS_KEY, JSON.stringify(defaultSectors));
-  }
-
-  // Seed Members
-  if (!localStorage.getItem(MEMBERS_KEY)) {
-    const dummyMembers: Member[] = [
-      {
-        id: '1',
-        fullName: 'João Silva',
-        birthDate: '1980-05-15',
-        phone: '(11) 99999-9999',
-        email: 'joao@example.com',
-        address: 'Rua das Flores, 123',
-        role: 'Diácono' as any,
-        isTither: true,
-        sector: 'SEDE',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '2',
-        fullName: 'Maria Souza',
-        birthDate: '1992-10-20',
-        phone: '(11) 98888-8888',
-        email: 'maria@example.com',
-        address: 'Av. Paulista, 1000',
-        role: 'Músico' as any,
-        isTither: true,
-        sector: 'SETOR_1',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '3',
-        fullName: 'Pedro Rocha',
-        birthDate: '2000-01-05',
-        phone: '(21) 97777-7777',
-        email: 'pedro@example.com',
-        address: 'Rua Augusta, 500',
-        role: 'Membro' as any,
-        isTither: false,
-        sector: 'SETOR_2',
-        createdAt: new Date().toISOString()
-      }
-    ];
-    localStorage.setItem(MEMBERS_KEY, JSON.stringify(dummyMembers));
+    await saveSectors(defaultSectors);
+    console.log('Database seeded with default sectors');
   }
 };

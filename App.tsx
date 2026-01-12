@@ -19,32 +19,37 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-        // Check local session
-        const storedUser = localStorage.getItem('ecclesia_user');
-        if (storedUser) {
-          setUserEmail(storedUser);
+        // Check Supabase session
+        const session = await storage.getCurrentSession();
+        if (session && session.user) {
+          setUserEmail(session.user.email || '');
           setIsAuthenticated(true);
         }
-        // Seed data if first run
-        storage.seedDatabase();
+
+        // Seed if necessary (checks empty tables)
+        await storage.seedDatabase();
         
-        // Load sectors
-        const loadedSectors = await storage.getSectors();
-        setSectors(loadedSectors);
+        // Load sectors if authenticated
+        if (session) {
+            const loadedSectors = await storage.getSectors();
+            setSectors(loadedSectors);
+        }
         
         setLoading(false);
     }
     init();
-  }, []);
+  }, [isAuthenticated]); // Reload when auth state changes
 
-  const handleLogin = (email: string) => {
-    localStorage.setItem('ecclesia_user', email);
+  const handleLogin = async (email: string) => {
     setUserEmail(email);
     setIsAuthenticated(true);
+    // Reload sectors after login
+    const loadedSectors = await storage.getSectors();
+    setSectors(loadedSectors);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('ecclesia_user');
+  const handleLogout = async () => {
+    await storage.logoutUser();
     setIsAuthenticated(false);
     setUserEmail('');
   };
@@ -53,7 +58,7 @@ const App: React.FC = () => {
       setSectors(newSectors);
   }
 
-  if (loading) return null;
+  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-emerald-600 font-medium">Carregando sistema...</div>;
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
