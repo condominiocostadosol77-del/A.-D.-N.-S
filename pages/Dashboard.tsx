@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -41,7 +41,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      // Don't set loading to true if we already have data (prevents flash on re-focus)
+      if (transactions.length === 0) setLoading(true);
+      
       const [txs, mems] = await Promise.all([
         storage.getTransactions(),
         storage.getMembers()
@@ -51,35 +53,26 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
       setLoading(false);
     };
     fetchData();
-  }, []); // Reload when mounted, filtering happens in render for speed
+  }, []); 
 
-  if (loading) return <div className="flex justify-center p-12 text-emerald-600">Carregando dados...</div>;
+  // --- Optimization: Memoize computations ---
+  
+  // 1. Filter Data
+  const { filteredTransactions, filteredMembers } = useMemo(() => {
+      return {
+          filteredTransactions: currentSector === 'ALL' 
+            ? transactions 
+            : transactions.filter(t => t.sector === currentSector),
+          filteredMembers: currentSector === 'ALL'
+            ? members
+            : members.filter(m => m.sector === currentSector)
+      };
+  }, [transactions, members, currentSector]);
 
-  // Helper to get Sector Name
+  // Helper to safely get sector name
   const getSectorName = (id: string) => {
     if (id === 'ALL') return 'Todos os Setores';
     return sectors.find(s => s.id === id)?.name || id;
-  };
-
-  // --- Filtering Logic ---
-  const filteredTransactions = currentSector === 'ALL' 
-    ? transactions 
-    : transactions.filter(t => t.sector === currentSector);
-
-  const filteredMembers = currentSector === 'ALL'
-    ? members
-    : members.filter(m => m.sector === currentSector);
-
-  // --- Calculations ---
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  // Helper to reliably check month/year from YYYY-MM-DD string
-  const isInMonth = (dateString: string, targetMonthIndex: number, targetYear: number) => {
-    if (!dateString) return false;
-    const [y, m] = dateString.split('-').map(Number);
-    // m is 1-based (01 to 12), Month Index is 0-based
-    return (m - 1) === targetMonthIndex && y === targetYear;
   };
 
   const formatDate = (dateString: string) => {
@@ -88,114 +81,143 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
     return `${day}/${month}/${year}`;
   };
 
-  const currentMonthTransactions = filteredTransactions.filter(t => 
-    isInMonth(t.date, currentMonth, currentYear)
-  );
+  // 2. Compute Dashboard Metrics (Heavy Logic)
+  const metrics = useMemo(() => {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
 
-  // Filter only Income (Tithes, Offerings, Special) for the detail list
-  const incomeTransactions = currentMonthTransactions
-    .filter(t => t.type !== TransactionType.EXPENSE)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Helper for date checking
+      const isInMonth = (dateString: string, targetMonthIndex: number, targetYear: number) => {
+        if (!dateString) return false;
+        const [y, m] = dateString.split('-').map(Number);
+        return (m - 1) === targetMonthIndex && y === targetYear;
+      };
 
-  const totalTithes = currentMonthTransactions
-    .filter(t => t.type === TransactionType.TITHE)
-    .reduce((sum, t) => sum + t.amount, 0);
+      const currentMonthTransactions = filteredTransactions.filter(t => 
+        isInMonth(t.date, currentMonth, currentYear)
+      );
 
-  const totalOfferings = currentMonthTransactions
-    .filter(t => t.type === TransactionType.OFFERING)
-    .reduce((sum, t) => sum + t.amount, 0);
+      const incomeTransactions = currentMonthTransactions
+        .filter(t => t.type !== TransactionType.EXPENSE)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalSpecial = currentMonthTransactions
-    .filter(t => t.type === TransactionType.SPECIAL_OFFERING)
-    .reduce((sum, t) => sum + t.amount, 0);
+      const totalTithes = currentMonthTransactions
+        .filter(t => t.type === TransactionType.TITHE)
+        .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalExpenses = currentMonthTransactions
-    .filter(t => t.type === TransactionType.EXPENSE)
-    .reduce((sum, t) => sum + t.amount, 0);
+      const totalOfferings = currentMonthTransactions
+        .filter(t => t.type === TransactionType.OFFERING)
+        .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalIncome = totalTithes + totalOfferings + totalSpecial;
-  const balance = totalIncome - totalExpenses;
+      const totalSpecial = currentMonthTransactions
+        .filter(t => t.type === TransactionType.SPECIAL_OFFERING)
+        .reduce((sum, t) => sum + t.amount, 0);
 
-  // --- Tithing Logic ---
-  // Only check tithers relevant to the current sector
-  const tithers = filteredMembers.filter(m => m.isTither);
-  const paidTitherIds = new Set(
-    currentMonthTransactions
-      .filter(t => t.type === TransactionType.TITHE && t.memberId)
-      .map(t => t.memberId!)
-  );
-  const unpaidTithers = tithers.filter(m => !paidTitherIds.has(m.id));
+      const totalExpenses = currentMonthTransactions
+        .filter(t => t.type === TransactionType.EXPENSE)
+        .reduce((sum, t) => sum + t.amount, 0);
 
-  // --- Charts Data ---
-  
-  // 1. Expense By Category
-  const expenseByCategory = currentMonthTransactions
-    .filter(t => t.type === TransactionType.EXPENSE)
-    .reduce((acc, t) => {
-      const cat = t.category || 'Outros';
-      acc[cat] = (acc[cat] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>);
+      const totalIncome = totalTithes + totalOfferings + totalSpecial;
+      const balance = totalIncome - totalExpenses;
 
-  const pieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
+      // Tithers Logic
+      const tithers = filteredMembers.filter(m => m.isTither);
+      const paidTitherIds = new Set(
+        currentMonthTransactions
+          .filter(t => t.type === TransactionType.TITHE && t.memberId)
+          .map(t => t.memberId!)
+      );
+      const unpaidTithers = tithers.filter(m => !paidTitherIds.has(m.id));
 
-  // 2. Monthly Evolution (Macro View)
-  const monthlyEvolution = [0, 1, 2, 3, 4, 5].map(i => {
-    let targetMonth = currentMonth - (5 - i);
-    let targetYear = currentYear;
-    
-    while (targetMonth < 0) {
-      targetMonth += 12;
-      targetYear -= 1;
-    }
+      return {
+          currentMonthTransactions,
+          incomeTransactions,
+          totalTithes,
+          totalOfferings,
+          totalSpecial,
+          totalExpenses,
+          totalIncome,
+          balance,
+          tithersCount: tithers.length,
+          unpaidTithers
+      };
+  }, [filteredTransactions, filteredMembers]);
 
-    // Filter transaction pool by date AND current sector
-    const monthTxs = transactions.filter(t => 
-      isInMonth(t.date, targetMonth, targetYear) && 
-      (currentSector === 'ALL' || t.sector === currentSector)
-    );
-
-    const income = monthTxs
-      .filter(t => t.type !== TransactionType.EXPENSE)
-      .reduce((s, t) => s + t.amount, 0);
+  // 3. Compute Chart Data
+  const chartsData = useMemo(() => {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
       
-    const expense = monthTxs
-      .filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((s, t) => s + t.amount, 0);
+      const isInMonth = (dateString: string, targetMonthIndex: number, targetYear: number) => {
+        if (!dateString) return false;
+        const [y, m] = dateString.split('-').map(Number);
+        return (m - 1) === targetMonthIndex && y === targetYear;
+      };
 
-    return {
-      name: `${targetMonth + 1}/${targetYear}`,
-      Receitas: income,
-      Despesas: expense
-    };
-  });
+      // Pie Chart Data
+      const expenseByCategory = metrics.currentMonthTransactions
+        .filter(t => t.type === TransactionType.EXPENSE)
+        .reduce((acc, t) => {
+          const cat = t.category || 'Outros';
+          acc[cat] = (acc[cat] || 0) + t.amount;
+          return acc;
+        }, {} as Record<string, number>);
 
-  // 3. Daily Evolution (Micro View - Current Month)
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-  
-  const dailyEvolution = Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    // Find transactions for this specific day
-    const dayTxs = currentMonthTransactions.filter(t => {
-      const [y, m, d] = t.date.split('-').map(Number);
-      return d === day;
-    });
+      const pieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
 
-    const income = dayTxs
-      .filter(t => t.type !== TransactionType.EXPENSE)
-      .reduce((s, t) => s + t.amount, 0);
+      // Monthly Evolution (Last 6 months)
+      const monthlyEvolution = [0, 1, 2, 3, 4, 5].map(i => {
+        let targetMonth = currentMonth - (5 - i);
+        let targetYear = currentYear;
+        
+        while (targetMonth < 0) {
+          targetMonth += 12;
+          targetYear -= 1;
+        }
 
-    const expense = dayTxs
-      .filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((s, t) => s + t.amount, 0);
+        // We use 'transactions' (raw) here but filter by sector manually to ensure we catch past months correctly
+        const monthTxs = transactions.filter(t => 
+          isInMonth(t.date, targetMonth, targetYear) && 
+          (currentSector === 'ALL' || t.sector === currentSector)
+        );
 
-    return {
-        name: `${day}`,
-        Receitas: income,
-        Despesas: expense
-    };
-  });
+        const income = monthTxs
+          .filter(t => t.type !== TransactionType.EXPENSE)
+          .reduce((s, t) => s + t.amount, 0);
+          
+        const expense = monthTxs
+          .filter(t => t.type === TransactionType.EXPENSE)
+          .reduce((s, t) => s + t.amount, 0);
+
+        return {
+          name: `${targetMonth + 1}/${targetYear}`,
+          Receitas: income,
+          Despesas: expense
+        };
+      });
+
+      // Daily Evolution
+      const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+      const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+      
+      const dailyEvolution = Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1;
+        const dayTxs = metrics.currentMonthTransactions.filter(t => {
+          const [y, m, d] = t.date.split('-').map(Number);
+          return d === day;
+        });
+
+        const income = dayTxs.filter(t => t.type !== TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+        const expense = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+
+        return { name: `${day}`, Receitas: income, Despesas: expense };
+      });
+
+      return { pieData, monthlyEvolution, dailyEvolution };
+  }, [metrics.currentMonthTransactions, transactions, currentSector]);
+
+
+  if (loading) return <div className="flex justify-center p-12 text-emerald-600 animate-pulse">Carregando dados...</div>;
 
   const Card = ({ title, value, icon: Icon, color, subtext }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow h-full flex flex-col justify-between">
@@ -210,7 +232,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           <Icon className={`w-6 h-6 ${color}`} />
         </div>
       </div>
-      {/* Updated to accept complex nodes */}
       {subtext && <div className="mt-3 pt-3 border-t border-slate-50">{subtext}</div>}
     </div>
   );
@@ -247,29 +268,29 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card 
           title="Entradas Totais" 
-          value={totalIncome} 
+          value={metrics.totalIncome} 
           icon={TrendingUp} 
           color="text-emerald-600"
           subtext={
             <div className="flex flex-col gap-1 text-xs text-slate-500">
                <div className="flex justify-between items-center">
                  <span>Dízimos:</span>
-                 <span className="font-semibold text-slate-700">R$ {totalTithes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                 <span className="font-semibold text-slate-700">R$ {metrics.totalTithes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                </div>
                <div className="flex justify-between items-center">
                  <span>Ofertas:</span>
-                 <span className="font-semibold text-slate-700">R$ {totalOfferings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                 <span className="font-semibold text-slate-700">R$ {metrics.totalOfferings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                </div>
                <div className="flex justify-between items-center bg-purple-50 px-1.5 py-0.5 -mx-1.5 rounded">
                  <span className="text-purple-700 font-medium">Ofertas Especiais:</span>
-                 <span className="font-bold text-purple-700">R$ {totalSpecial.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                 <span className="font-bold text-purple-700">R$ {metrics.totalSpecial.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                </div>
             </div>
           }
         />
         <Card 
           title="Saídas Totais" 
-          value={totalExpenses} 
+          value={metrics.totalExpenses} 
           icon={TrendingDown} 
           color="text-red-500" 
           subtext={
@@ -280,9 +301,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
         />
         <Card 
           title="Saldo do Mês" 
-          value={balance} 
+          value={metrics.balance} 
           icon={DollarSign} 
-          color={balance >= 0 ? "text-blue-600" : "text-red-600"}
+          color={metrics.balance >= 0 ? "text-blue-600" : "text-red-600"}
           subtext={
             <div className="text-xs text-slate-400 mt-1">
               Balanço final (Entradas - Saídas)
@@ -294,7 +315,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
             <div>
               <p className="text-sm font-medium text-slate-500 mb-1">Dizimistas Pendentes</p>
               <h3 className="text-2xl font-bold text-amber-500">
-                {unpaidTithers.length} / {tithers.length}
+                {metrics.unpaidTithers.length} / {metrics.tithersCount}
               </h3>
             </div>
             <div className="p-3 rounded-full bg-amber-100">
@@ -307,7 +328,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Daily Chart Section (New) */}
+      {/* Daily Chart Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
         <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-emerald-600" />
@@ -315,7 +336,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
         </div>
         <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dailyEvolution}>
+            <BarChart data={chartsData.dailyEvolution}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
             <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
@@ -338,7 +359,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Evolução Financeira (Últimos 6 Meses)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyEvolution}>
+              <BarChart data={chartsData.monthlyEvolution}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val/1000}k`} />
@@ -357,11 +378,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Saídas por Categoria</h3>
           <div className="h-64 flex justify-center items-center">
-            {pieData.length > 0 ? (
+            {chartsData.pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={pieData}
+                    data={chartsData.pieData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -369,7 +390,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {pieData.map((entry, index) => (
+                    {chartsData.pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -403,8 +424,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {incomeTransactions.length > 0 ? (
-                  incomeTransactions.map((tx) => {
+                {metrics.incomeTransactions.length > 0 ? (
+                  metrics.incomeTransactions.map((tx) => {
                     const memberName = tx.memberId ? members.find(m => m.id === tx.memberId)?.fullName : null;
                     const displayDescription = tx.type === TransactionType.TITHE 
                       ? `Dízimo de ${memberName || 'Desconhecido'}` 
@@ -469,8 +490,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {unpaidTithers.length > 0 ? (
-                  unpaidTithers.map((member) => (
+                {metrics.unpaidTithers.length > 0 ? (
+                  metrics.unpaidTithers.map((member) => (
                     <tr key={member.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-800">{member.fullName}</div>
