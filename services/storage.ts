@@ -50,17 +50,18 @@ const mapTransactionFromDB = (t: any): Transaction => ({
   createdAt: t.created_at
 });
 
+// Improved mapper: Converts empty strings/undefined to null to prevent DB errors
 const mapTransactionToDB = (t: Transaction) => ({
   id: t.id,
   type: t.type,
   date: t.date,
   amount: t.amount,
-  member_id: t.memberId,
-  description: t.description,
-  category: t.category,
-  receipt_url: t.receiptUrl,
-  payment_method: t.paymentMethod,
-  pix_destination: t.pixDestination,
+  member_id: t.memberId || null,
+  description: t.description || null,
+  category: t.category || null,
+  receipt_url: t.receiptUrl || null,
+  payment_method: t.paymentMethod || null,
+  pix_destination: t.pixDestination || null,
   sector: t.sector,
   created_at: t.createdAt
 });
@@ -89,16 +90,21 @@ const mapDisciplineToDB = (d: Discipline) => ({
 
 export const registerUser = async (user: User & { password: string }): Promise<boolean> => {
   try {
-    // 1. Create Auth User
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: user.email,
       password: user.password,
       options: {
         data: {
-          full_name: user.name // Salva no metadado do Auth também como backup
+          full_name: user.name
         }
       }
     });
+
+    if (authError && authError.message.includes("already registered")) {
+        console.log("Usuário já existe no Auth, tentando logar para corrigir perfil...");
+        const loggedUser = await loginUser(user.email, user.password);
+        return !!loggedUser;
+    }
 
     if (authError) {
       console.error('Auth Error:', authError);
@@ -106,13 +112,16 @@ export const registerUser = async (user: User & { password: string }): Promise<b
     }
 
     if (authData.user) {
-        // 2. Create Public Profile
-        // Se falhar aqui, o loginUser corrige depois
-        await supabase.from('app_users').insert({
+        const { error: profileError } = await supabase.from('app_users').upsert({
             id: authData.user.id,
             email: user.email,
             name: user.name
         });
+
+        if (profileError) {
+            console.error("Erro ao criar perfil:", profileError);
+        }
+        
         return true;
     }
 
@@ -137,20 +146,17 @@ export const loginUser = async (email: string, password: string): Promise<User |
     
     if (!data.user) return null;
 
-    // Tenta pegar o perfil do usuário
-    let { data: profile } = await supabase
+    let { data: profile, error: profileFetchError } = await supabase
       .from('app_users')
       .select('name')
       .eq('id', data.user.id)
       .single();
 
-    // AUTO-CORREÇÃO: 
-    // Se o usuário logou no Auth, mas não tem perfil na tabela app_users (o problema que você teve),
-    // nós criamos o perfil agora automaticamente.
-    if (!profile) {
+    if (!profile || profileFetchError) {
+        console.log("Perfil não encontrado no banco, criando automaticamente...");
         const userName = data.user.user_metadata?.full_name || 'Administrador';
         
-        const { error: insertError } = await supabase.from('app_users').insert({
+        const { error: insertError } = await supabase.from('app_users').upsert({
             id: data.user.id,
             email: data.user.email,
             name: userName
@@ -158,6 +164,8 @@ export const loginUser = async (email: string, password: string): Promise<User |
 
         if (!insertError) {
             profile = { name: userName };
+        } else {
+            console.error("Falha crítica ao criar perfil automático:", insertError);
         }
     }
 
@@ -193,10 +201,6 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 export const deleteUser = async (email: string): Promise<void> => {
-  // Nota: Deletar usuário do Supabase Auth exige Service Role Key (backend).
-  // Do client-side, podemos apenas remover da tabela 'app_users', o que remove acesso visual,
-  // mas o login ainda funcionaria. Para uma app completa, isso deveria ser uma Edge Function.
-  // Por enquanto, deletaremos da tabela de referência.
   await supabase.from('app_users').delete().eq('email', email);
 };
 
@@ -212,7 +216,6 @@ export const getSectors = async (): Promise<Sector[]> => {
 };
 
 export const saveSectors = async (sectors: Sector[]): Promise<void> => {
-  // Upsert all sectors
   const { error } = await supabase.from('sectors').upsert(sectors);
   if (error) console.error(error);
 };
@@ -284,8 +287,8 @@ export const saveTransaction = async (transaction: Transaction): Promise<Transac
   const dbTx = mapTransactionToDB(transaction);
   const { error } = await supabase.from('transactions').upsert(dbTx);
   if (error) {
-      console.error(error);
-      throw error;
+      console.error("Erro ao salvar transação:", error);
+      throw error; // Re-throw to be caught in the UI
   }
   return transaction;
 };
@@ -304,7 +307,6 @@ export const getMemberById = async (id: string): Promise<Member | undefined> => 
 };
 
 export const seedDatabase = async () => {
-  // Check if sectors exist
   const sectors = await getSectors();
   if (sectors.length === 0) {
     const defaultSectors: Sector[] = [
@@ -313,6 +315,5 @@ export const seedDatabase = async () => {
       { id: 'SETOR_2', name: 'Setor 2' }
     ];
     await saveSectors(defaultSectors);
-    console.log('Database seeded with default sectors');
   }
 };

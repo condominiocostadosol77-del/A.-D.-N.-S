@@ -8,7 +8,7 @@ import {
   Sector
 } from '../types';
 import * as storage from '../services/storage';
-import { Plus, Trash2, FileText, Download, Search, AlertTriangle, MapPin, Printer } from 'lucide-react';
+import { Plus, Trash2, FileText, Download, Search, AlertTriangle, MapPin, Printer, Loader2 } from 'lucide-react';
 
 interface FinancialsProps {
   currentSector: string;
@@ -21,6 +21,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for save button
   
   // Delete State
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -73,45 +74,59 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.amount || formData.amount <= 0) {
-      alert('Insira um valor válido');
+      alert('Insira um valor válido maior que zero.');
       return;
     }
 
-    let type: TransactionType;
-    if (activeTab === 'tithes') type = TransactionType.TITHE;
-    else if (activeTab === 'offerings') type = TransactionType.OFFERING;
-    else if (activeTab === 'special') type = TransactionType.SPECIAL_OFFERING;
-    else type = TransactionType.EXPENSE;
+    setIsSubmitting(true);
 
-    const newTx: Transaction = {
-      id: crypto.randomUUID(),
-      type,
-      date: formData.date!,
-      amount: Number(formData.amount),
-      memberId: formData.memberId,
-      description: formData.description,
-      category: formData.category,
-      receiptUrl: formData.receiptUrl,
-      paymentMethod: formData.paymentMethod,
-      pixDestination: formData.paymentMethod === PaymentMethod.PIX ? formData.pixDestination : undefined,
-      sector: formData.sector || 'SEDE',
-      createdAt: new Date().toISOString()
-    };
+    try {
+        let type: TransactionType;
+        if (activeTab === 'tithes') type = TransactionType.TITHE;
+        else if (activeTab === 'offerings') type = TransactionType.OFFERING;
+        else if (activeTab === 'special') type = TransactionType.SPECIAL_OFFERING;
+        else type = TransactionType.EXPENSE;
 
-    await storage.saveTransaction(newTx);
-    setIsModalOpen(false);
-    // Reset form but keep date and current sector
-    setFormData({ 
-      date: formData.date, 
-      amount: 0, 
-      paymentMethod: PaymentMethod.CASH,
-      description: '',
-      pixDestination: '',
-      memberId: '',
-      sector: currentSector === 'ALL' ? 'SEDE' : currentSector
-    });
-    loadData();
+        const newTx: Transaction = {
+          id: crypto.randomUUID(),
+          type,
+          date: formData.date!,
+          amount: Number(formData.amount),
+          // Ensure optional fields are undefined if not used, so they don't send garbage
+          memberId: (activeTab !== 'expenses' && formData.memberId) ? formData.memberId : undefined,
+          description: formData.description || undefined,
+          category: (activeTab === 'expenses') ? formData.category : undefined,
+          receiptUrl: formData.receiptUrl || undefined,
+          paymentMethod: (activeTab !== 'expenses') ? formData.paymentMethod : undefined,
+          pixDestination: (formData.paymentMethod === PaymentMethod.PIX) ? formData.pixDestination : undefined,
+          sector: formData.sector || 'SEDE',
+          createdAt: new Date().toISOString()
+        };
+
+        await storage.saveTransaction(newTx);
+        
+        // Success
+        setIsModalOpen(false);
+        // Reset form but keep date and current sector
+        setFormData({ 
+          date: formData.date, 
+          amount: 0, 
+          paymentMethod: PaymentMethod.CASH,
+          description: '',
+          pixDestination: '',
+          memberId: '',
+          sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+        });
+        loadData();
+
+    } catch (error) {
+        console.error("Erro ao salvar:", error);
+        alert("Ocorreu um erro ao salvar o registro.\n\nVerifique se as tabelas do banco de dados foram criadas corretamente (Execute o código SQL no Supabase).");
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const requestDelete = (e: React.MouseEvent, id: string) => {
@@ -131,6 +146,11 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Basic size check
+      if (file.size > 1048576) { 
+         alert('A imagem do comprovante é muito grande. Use arquivos menores que 1MB.');
+         return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, receiptUrl: reader.result as string }));
@@ -169,9 +189,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
       return true;
     });
 
-  // Filter members for dropdown based on form sector (if creating tithe)
-  // Or should we allow selecting any member? Let's allow any member but sort/prioritize?
-  // Let's filter dropdown to only show members of the selected sector in the form for better UX
   const availableMembersForForm = members.filter(m => m.sector === formData.sector);
 
   return (
@@ -530,13 +547,21 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
               )}
 
               <button 
-                type="submit" 
-                className={`w-full text-white py-3 rounded-lg font-medium shadow-sm transition-colors mt-6
-                  ${activeTab === 'expenses' ? 'bg-red-600 hover:bg-red-700' : 
-                    activeTab === 'special' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full text-white py-3 rounded-lg font-medium shadow-sm transition-colors mt-6 flex justify-center items-center gap-2
+                  ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : (
+                      activeTab === 'expenses' ? 'bg-red-600 hover:bg-red-700' : 
+                      activeTab === 'special' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                  )}
+                `}
               >
-                Salvar Registro
+                {isSubmitting ? (
+                    <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Salvando...
+                    </>
+                ) : 'Salvar Registro'}
               </button>
             </form>
           </div>
