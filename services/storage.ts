@@ -93,26 +93,30 @@ export const registerUser = async (user: User & { password: string }): Promise<b
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: user.email,
       password: user.password,
+      options: {
+        data: {
+          full_name: user.name // Salva no metadado do Auth também como backup
+        }
+      }
     });
 
-    if (authError || !authData.user) {
+    if (authError) {
       console.error('Auth Error:', authError);
       return false;
     }
 
-    // 2. Create Public Profile
-    const { error: profileError } = await supabase.from('app_users').insert({
-      id: authData.user.id,
-      email: user.email,
-      name: user.name
-    });
-
-    if (profileError) {
-      console.error('Profile Error:', profileError);
-      return false;
+    if (authData.user) {
+        // 2. Create Public Profile
+        // Se falhar aqui, o loginUser corrige depois
+        await supabase.from('app_users').insert({
+            id: authData.user.id,
+            email: user.email,
+            name: user.name
+        });
+        return true;
     }
 
-    return true;
+    return false;
   } catch (e) {
     console.error(e);
     return false;
@@ -126,14 +130,36 @@ export const loginUser = async (email: string, password: string): Promise<User |
       password
     });
 
-    if (error || !data.user) return null;
+    if (error) {
+        console.error("Erro Login:", error);
+        return null;
+    }
+    
+    if (!data.user) return null;
 
-    // Get user profile for the name
-    const { data: profile } = await supabase
+    // Tenta pegar o perfil do usuário
+    let { data: profile } = await supabase
       .from('app_users')
       .select('name')
       .eq('id', data.user.id)
       .single();
+
+    // AUTO-CORREÇÃO: 
+    // Se o usuário logou no Auth, mas não tem perfil na tabela app_users (o problema que você teve),
+    // nós criamos o perfil agora automaticamente.
+    if (!profile) {
+        const userName = data.user.user_metadata?.full_name || 'Administrador';
+        
+        const { error: insertError } = await supabase.from('app_users').insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: userName
+        });
+
+        if (!insertError) {
+            profile = { name: userName };
+        }
+    }
 
     return {
       email: data.user.email || email,
