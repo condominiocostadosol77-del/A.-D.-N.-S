@@ -2,14 +2,14 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Users, 
-  Wallet, 
   LogOut, 
   Menu,
   X,
   Church,
   MapPin,
   Settings,
-  Gavel
+  Gavel,
+  ClipboardCheck
 } from 'lucide-react';
 import { Sector } from '../types';
 
@@ -37,10 +37,10 @@ const Layout: React.FC<LayoutProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const navItems = [
-    { id: 'dashboard', label: 'Relatórios', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'members', label: 'Membros', icon: Users },
-    { id: 'disciplines', label: 'Membros Disciplinados', icon: Gavel },
-    { id: 'financial', label: 'Financeiro', icon: Wallet },
+    { id: 'disciplines', label: 'Disciplina', icon: Gavel },
+    { id: 'tithers', label: 'Controle de Dizimistas', icon: ClipboardCheck },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
@@ -54,7 +54,6 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    // Changed: h-screen and overflow-hidden to lock viewport, added print classes to fix PDF generation
     <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row overflow-hidden print:h-auto print:overflow-visible">
       {/* Mobile Header */}
       <div className="md:hidden bg-emerald-700 text-white p-4 flex justify-between items-center shadow-md z-50 flex-shrink-0">
@@ -142,7 +141,6 @@ const Layout: React.FC<LayoutProps> = ({
       </aside>
 
       {/* Main Content */}
-      {/* Changed: flex-1, overflow-y-auto to allow only this area to scroll */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 relative print:overflow-visible print:h-auto print:w-full">
         <div className="max-w-7xl mx-auto print:max-w-none">
           {children}

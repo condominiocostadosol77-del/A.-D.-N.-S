@@ -44,7 +44,8 @@ export interface Discipline {
 }
 
 export enum TransactionType {
-  TITHE = 'Dízimo',
+  TITHE = 'Dízimo', // Legacy (kept for safety)
+  TITHE_RECORD = 'Registro de Dízimo', // New checkbox type
   OFFERING = 'Oferta',
   SPECIAL_OFFERING = 'Oferta Especial',
   EXPENSE = 'Saída'

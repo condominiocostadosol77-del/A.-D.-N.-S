@@ -3,7 +3,7 @@ import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
-import Financials from './pages/Financials';
+import TithersControl from './pages/TithersControl';
 import Settings from './pages/Settings';
 import Disciplines from './pages/Disciplines';
 import * as storage from './services/storage';
@@ -69,7 +69,7 @@ const App: React.FC = () => {
       case 'dashboard': return <Dashboard currentSector={currentSector} sectors={sectors} />;
       case 'members': return <Members currentSector={currentSector} sectors={sectors} />;
       case 'disciplines': return <Disciplines currentSector={currentSector} sectors={sectors} />;
-      case 'financial': return <Financials currentSector={currentSector} sectors={sectors} />;
+      case 'tithers': return <TithersControl currentSector={currentSector} sectors={sectors} />;
       case 'settings': return <Settings sectors={sectors} onUpdateSectors={handleUpdateSectors} currentUserEmail={userEmail} />;
       default: return <Dashboard currentSector={currentSector} sectors={sectors} />;
     }
