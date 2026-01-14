@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Users, 
   AlertCircle,
-  MapPin,
   Printer,
   PieChart as PieChartIcon,
   CheckCircle2
@@ -15,7 +14,7 @@ import {
     Tooltip,
     Legend
 } from 'recharts';
-import { Member, Transaction, TransactionType, Sector, Discipline } from '../types';
+import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
@@ -28,21 +27,18 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       if (members.length === 0) setLoading(true);
       
-      const [mems, discs, txs] = await Promise.all([
+      const [mems, discs] = await Promise.all([
         storage.getMembers(),
-        storage.getDisciplines(),
-        storage.getTransactions()
+        storage.getDisciplines()
       ]);
       setMembers(mems);
       setDisciplines(discs);
-      setTransactions(txs);
       setLoading(false);
     };
     fetchData();
@@ -53,8 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
   const { 
       filteredMembers, 
       activeDisciplinesCount,
-      totalTithers,
-      tithersCheckedThisMonth
+      totalTithers
   } = useMemo(() => {
       // Filter Members
       const fMembers = currentSector === 'ALL' 
@@ -69,31 +64,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           return (currentSector === 'ALL' || d.sector === currentSector) && end >= now;
       });
 
-      // Tithers Logic (Checkbox based)
-      const tithers = fMembers.filter(m => m.isTither);
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-
-      const checkedIds = new Set(
-          transactions
-          .filter(t => {
-              const d = new Date(t.date);
-              // Consider legacy TITHE or new TITHE_RECORD
-              const isTithe = t.type === TransactionType.TITHE || t.type === TransactionType.TITHE_RECORD;
-              return isTithe && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-          })
-          .map(t => t.memberId)
-      );
-      
-      const checkedCount = tithers.filter(m => checkedIds.has(m.id)).length;
+      // Tithers Logic (Static Count only)
+      const tithersCount = fMembers.filter(m => m.isTither).length;
 
       return {
           filteredMembers: fMembers,
           activeDisciplinesCount: activeDiscs.length,
-          totalTithers: tithers.length,
-          tithersCheckedThisMonth: checkedCount
+          totalTithers: tithersCount
       };
-  }, [members, disciplines, transactions, currentSector]);
+  }, [members, disciplines, currentSector]);
 
   // Chart Data: Roles Distribution
   const roleData = useMemo(() => {
@@ -176,34 +155,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           subtext="Membros sob disciplina eclesiástica ativa"
         />
         <Card 
-          title="Dizimistas Confirmados (Mês)" 
-          value={`${tithersCheckedThisMonth} / ${totalTithers}`} 
+          title="Total de Dizimistas" 
+          value={totalTithers} 
           icon={CheckCircle2} 
           color="text-emerald-600"
-          subtext={
-            <div className="flex items-center gap-2">
-                <div className="w-full bg-slate-100 rounded-full h-1.5 flex-1">
-                    <div 
-                        className="bg-emerald-500 h-1.5 rounded-full" 
-                        style={{ width: `${totalTithers > 0 ? (tithersCheckedThisMonth / totalTithers) * 100 : 0}%` }}
-                    ></div>
-                </div>
-                <span className="text-xs font-bold text-emerald-700">
-                    {totalTithers > 0 ? Math.round((tithersCheckedThisMonth / totalTithers) * 100) : 0}%
-                </span>
-            </div>
-          } 
+          subtext="Membros marcados como dizimistas no cadastro"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Members by Role Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
+      {/* Members by Role Chart - Full Width now */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 break-inside-avoid">
           <div className="flex items-center gap-2 mb-4">
               <PieChartIcon className="w-5 h-5 text-emerald-600" />
               <h3 className="text-lg font-semibold text-slate-800">Distribuição por Cargos</h3>
           </div>
-          <div className="h-72 w-full">
+          <div className="h-80 w-full">
             {roleData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -211,8 +177,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                         data={roleData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
+                        innerRadius={80}
+                        outerRadius={120}
                         paddingAngle={2}
                         dataKey="value"
                     >
@@ -228,10 +194,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                         layout="vertical" 
                         align="right" 
                         verticalAlign="middle" 
-                        wrapperStyle={{ fontSize: '12px' }}
+                        wrapperStyle={{ fontSize: '13px' }}
                         formatter={(value, entry: any) => {
                           const { payload } = entry;
-                          return <span className="text-slate-600">{value} <strong className="ml-1 text-slate-800">({payload.value})</strong></span>;
+                          return <span className="text-slate-600 ml-2">{value} <strong className="ml-1 text-slate-800">({payload.value})</strong></span>;
                         }}
                     />
                     </PieChart>
@@ -242,69 +208,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
                 </div>
             )}
           </div>
-        </div>
-
-        {/* Recent Activity / Alert List */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-slate-100">
-                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-amber-500" />
-                    Pendências de Dízimo
-                </h3>
-            </div>
-            <div className="flex-1 overflow-y-auto max-h-72 p-0">
-                {totalTithers - tithersCheckedThisMonth > 0 ? (
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 sticky top-0">
-                            <tr>
-                                <th className="px-6 py-3 font-medium">Nome</th>
-                                <th className="px-6 py-3 font-medium text-right">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {filteredMembers
-                             .filter(m => m.isTither) // Only tithers
-                             .filter(m => {
-                                // Filter those NOT in the checked list
-                                const checkedIds = new Set(
-                                    transactions
-                                    .filter(t => {
-                                        const d = new Date(t.date);
-                                        const currentMonth = new Date().getMonth();
-                                        const currentYear = new Date().getFullYear();
-                                        return (t.type === TransactionType.TITHE || t.type === TransactionType.TITHE_RECORD) && 
-                                               d.getMonth() === currentMonth && 
-                                               d.getFullYear() === currentYear;
-                                    })
-                                    .map(t => t.memberId)
-                                );
-                                return !checkedIds.has(m.id);
-                             })
-                             .slice(0, 10) // Limit to top 10
-                             .map(m => (
-                               <tr key={m.id} className="hover:bg-slate-50">
-                                   <td className="px-6 py-3 text-slate-700">{m.fullName}</td>
-                                   <td className="px-6 py-3 text-right">
-                                       <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-full font-medium">Pendente</span>
-                                   </td>
-                               </tr>
-                             ))
-                           }
-                        </tbody>
-                    </table>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-400">
-                        <CheckCircle2 className="w-10 h-10 text-emerald-200 mb-2" />
-                        <p>Todos os dizimistas estão em dia este mês!</p>
-                    </div>
-                )}
-            </div>
-            {totalTithers - tithersCheckedThisMonth > 10 && (
-                <div className="p-2 text-center text-xs text-slate-400 bg-slate-50 border-t border-slate-100">
-                    E mais {totalTithers - tithersCheckedThisMonth - 10} pendentes...
-                </div>
-            )}
-        </div>
       </div>
     </div>
   );
