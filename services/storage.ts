@@ -1,10 +1,22 @@
 import { Member, Transaction, User, Sector, Discipline, Asset, WorkProject } from '../types';
+import { db, isFirebaseInitialized } from './firebase';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  setDoc,
+  query,
+  where
+} from 'firebase/firestore';
 
-// Simula um pequeno delay de rede para parecer mais natural
+// Delay simulado apenas para LocalStorage para UX consistente
 const DELAY = 300;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// --- LocalStorage Keys ---
+// --- LocalStorage Keys (Fallback) ---
 const KEYS = {
   MEMBERS: 'app_members',
   TRANSACTIONS: 'app_transactions',
@@ -12,51 +24,72 @@ const KEYS = {
   SECTORS: 'app_sectors',
   USERS: 'app_users',
   SESSION: 'app_session',
-  ASSETS: 'app_assets',     // NEW
-  WORKS: 'app_works'        // NEW
+  ASSETS: 'app_assets',
+  WORKS: 'app_works'
 };
 
-// --- Helpers ---
-const getList = <T>(key: string): T[] => {
+// --- Helpers para LocalStorage ---
+const getListLocal = <T>(key: string): T[] => {
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 };
 
-const saveList = (key: string, list: any[]) => {
+const saveListLocal = (key: string, list: any[]) => {
   localStorage.setItem(key, JSON.stringify(list));
 };
+
+// ==========================================
+// MÉTODOS DE ARMAZENAMENTO (HÍBRIDO)
+// ==========================================
 
 // --- Auth ---
 
 export const registerUser = async (user: User & { password: string }): Promise<boolean> => {
-  await sleep(DELAY);
-  const users = getList<User & { password: string }>(KEYS.USERS);
-  
-  if (users.find(u => u.email === user.email)) return false;
-  
-  users.push(user);
-  saveList(KEYS.USERS, users);
-  
-  // Auto login
-  localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
-  return true;
+  if (isFirebaseInitialized) {
+     // Em um app real, usariamos Firebase Auth. 
+     // Aqui, simularemos usando uma coleção 'users' no Firestore para manter compatibilidade simples.
+     const q = query(collection(db, 'users'), where("email", "==", user.email));
+     const querySnapshot = await getDocs(q);
+     if (!querySnapshot.empty) return false;
+
+     await addDoc(collection(db, 'users'), user);
+     localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
+     return true;
+  } else {
+    await sleep(DELAY);
+    const users = getListLocal<User & { password: string }>(KEYS.USERS);
+    if (users.find(u => u.email === user.email)) return false;
+    users.push(user);
+    saveListLocal(KEYS.USERS, users);
+    localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
+    return true;
+  }
 };
 
 export const loginUser = async (email: string, password: string): Promise<User | null> => {
-  await sleep(DELAY);
-  const users = getList<User & { password: string }>(KEYS.USERS);
-  const user = users.find(u => u.email === email && u.password === password);
-  
-  if (user) {
-    const sessionUser = { email: user.email, name: user.name };
-    localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: sessionUser }));
-    return sessionUser;
+  if (isFirebaseInitialized) {
+      const q = query(collection(db, 'users'), where("email", "==", email), where("password", "==", password));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+          const userData = querySnapshot.docs[0].data() as User;
+          const sessionUser = { email: userData.email, name: userData.name };
+          localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: sessionUser }));
+          return sessionUser;
+      }
+      return null;
+  } else {
+    await sleep(DELAY);
+    const users = getListLocal<User & { password: string }>(KEYS.USERS);
+    const user = users.find(u => u.email === email && u.password === password);
+    if (user) {
+      const sessionUser = { email: user.email, name: user.name };
+      localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: sessionUser }));
+      return sessionUser;
+    }
+    return null;
   }
-  return null;
 };
 
 export const logoutUser = async () => {
@@ -69,172 +102,138 @@ export const getCurrentSession = async () => {
 };
 
 export const getUsers = async (): Promise<User[]> => {
-    return getList<User>(KEYS.USERS).map(u => ({ name: u.name, email: u.email }));
+    if (isFirebaseInitialized) {
+        const snapshot = await getDocs(collection(db, 'users'));
+        return snapshot.docs.map(d => ({ name: d.data().name, email: d.data().email }));
+    } else {
+        return getListLocal<User>(KEYS.USERS).map(u => ({ name: u.name, email: u.email }));
+    }
 }
 
 export const deleteUser = async (email: string): Promise<void> => {
-    const users = getList<User>(KEYS.USERS);
-    saveList(KEYS.USERS, users.filter(u => u.email !== email));
+    if (isFirebaseInitialized) {
+        const q = query(collection(db, 'users'), where("email", "==", email));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+    } else {
+        const users = getListLocal<User>(KEYS.USERS);
+        saveListLocal(KEYS.USERS, users.filter(u => u.email !== email));
+    }
 }
 
-// --- Sectors ---
+// --- Generic Helpers for Collections ---
 
-export const getSectors = async (): Promise<Sector[]> => {
-  await sleep(DELAY);
-  return getList<Sector>(KEYS.SECTORS);
+const getCollection = async <T>(collectionName: string, localKey: string): Promise<T[]> => {
+    if (isFirebaseInitialized) {
+        const snapshot = await getDocs(collection(db, collectionName));
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as unknown as T[];
+    } else {
+        await sleep(DELAY);
+        return getListLocal<T>(localKey);
+    }
+}
+
+const saveItem = async <T extends { id: string }>(collectionName: string, localKey: string, item: T): Promise<T> => {
+    if (isFirebaseInitialized) {
+        // Use setDoc with the specific ID to ensure IDs are consistent or update existing
+        await setDoc(doc(db, collectionName, item.id), item);
+        return item;
+    } else {
+        await sleep(DELAY);
+        const list = getListLocal<T>(localKey);
+        const index = list.findIndex((i: any) => i.id === item.id);
+        if (index >= 0) list[index] = item;
+        else list.push(item);
+        saveListLocal(localKey, list);
+        return item;
+    }
+}
+
+const deleteItem = async (collectionName: string, localKey: string, id: string): Promise<void> => {
+    if (isFirebaseInitialized) {
+        await deleteDoc(doc(db, collectionName, id));
+    } else {
+        await sleep(DELAY);
+        const list = getListLocal<any>(localKey);
+        saveListLocal(localKey, list.filter(i => i.id !== id));
+    }
+}
+
+// --- Specific Entity Implementations ---
+
+// Sectors
+export const getSectors = () => getCollection<Sector>('sectors', KEYS.SECTORS);
+export const saveSectors = async (sectors: Sector[]) => {
+    if (isFirebaseInitialized) {
+        // Replace strategy implies deleting all and rewriting, but Firestore is document based.
+        // For simplicity in this "settings" context, we'll update them one by one or managing a single doc if it was a config.
+        // But since we use array locally, let's just loop save. 
+        // NOTE: Deleting removed sectors is harder here without a proper sync logic.
+        // Simplified: Save all current.
+        for (const s of sectors) {
+            await setDoc(doc(db, 'sectors', s.id), s);
+        }
+    } else {
+        await sleep(DELAY);
+        saveListLocal(KEYS.SECTORS, sectors);
+    }
 };
 
-export const saveSectors = async (sectors: Sector[]): Promise<void> => {
-  await sleep(DELAY);
-  saveList(KEYS.SECTORS, sectors);
-};
+// Members
+export const getMembers = () => getCollection<Member>('members', KEYS.MEMBERS);
+export const saveMember = (m: Member) => saveItem('members', KEYS.MEMBERS, m);
+export const deleteMember = (id: string) => deleteItem('members', KEYS.MEMBERS, id);
 
-// --- Members ---
+// Disciplines
+export const getDisciplines = () => getCollection<Discipline>('disciplines', KEYS.DISCIPLINES);
+export const saveDiscipline = (d: Discipline) => saveItem('disciplines', KEYS.DISCIPLINES, d);
+export const deleteDiscipline = (id: string) => deleteItem('disciplines', KEYS.DISCIPLINES, id);
 
-export const getMembers = async (): Promise<Member[]> => {
-  await sleep(DELAY);
-  return getList<Member>(KEYS.MEMBERS);
-};
+// Transactions
+export const getTransactions = () => getCollection<Transaction>('transactions', KEYS.TRANSACTIONS);
+export const saveTransaction = (t: Transaction) => saveItem('transactions', KEYS.TRANSACTIONS, t);
+export const deleteTransaction = (id: string) => deleteItem('transactions', KEYS.TRANSACTIONS, id);
 
-export const saveMember = async (member: Member): Promise<Member> => {
-  await sleep(DELAY);
-  const members = getList<Member>(KEYS.MEMBERS);
-  const index = members.findIndex(m => m.id === member.id);
-  
-  if (index >= 0) members[index] = member;
-  else members.push(member);
-  
-  saveList(KEYS.MEMBERS, members);
-  return member;
-};
+// Assets
+export const getAssets = () => getCollection<Asset>('assets', KEYS.ASSETS);
+export const saveAsset = (a: Asset) => saveItem('assets', KEYS.ASSETS, a);
+export const deleteAsset = (id: string) => deleteItem('assets', KEYS.ASSETS, id);
 
-export const deleteMember = async (id: string): Promise<void> => {
-  await sleep(DELAY);
-  const members = getList<Member>(KEYS.MEMBERS);
-  saveList(KEYS.MEMBERS, members.filter(m => m.id !== id));
-};
-
-// --- Disciplines ---
-
-export const getDisciplines = async (): Promise<Discipline[]> => {
-  await sleep(DELAY);
-  return getList<Discipline>(KEYS.DISCIPLINES);
-};
-
-export const saveDiscipline = async (discipline: Discipline): Promise<Discipline> => {
-  await sleep(DELAY);
-  const list = getList<Discipline>(KEYS.DISCIPLINES);
-  const index = list.findIndex(d => d.id === discipline.id);
-  
-  if (index >= 0) list[index] = discipline;
-  else list.push(discipline);
-  
-  saveList(KEYS.DISCIPLINES, list);
-  return discipline;
-};
-
-export const deleteDiscipline = async (id: string): Promise<void> => {
-  await sleep(DELAY);
-  const list = getList<Discipline>(KEYS.DISCIPLINES);
-  saveList(KEYS.DISCIPLINES, list.filter(d => d.id !== id));
-};
-
-// --- Transactions ---
-
-export const getTransactions = async (): Promise<Transaction[]> => {
-  await sleep(DELAY);
-  return getList<Transaction>(KEYS.TRANSACTIONS);
-};
-
-export const saveTransaction = async (transaction: Transaction): Promise<Transaction> => {
-  await sleep(DELAY);
-  const list = getList<Transaction>(KEYS.TRANSACTIONS);
-  const index = list.findIndex(t => t.id === transaction.id);
-  
-  if (index >= 0) list[index] = transaction;
-  else list.push(transaction);
-  
-  saveList(KEYS.TRANSACTIONS, list);
-  return transaction;
-};
-
-export const deleteTransaction = async (id: string): Promise<void> => {
-  await sleep(DELAY);
-  const list = getList<Transaction>(KEYS.TRANSACTIONS);
-  saveList(KEYS.TRANSACTIONS, list.filter(t => t.id !== id));
-};
-
-// --- Assets (Patrimônio) ---
-
-export const getAssets = async (): Promise<Asset[]> => {
-  await sleep(DELAY);
-  return getList<Asset>(KEYS.ASSETS);
-};
-
-export const saveAsset = async (asset: Asset): Promise<Asset> => {
-  await sleep(DELAY);
-  const list = getList<Asset>(KEYS.ASSETS);
-  const index = list.findIndex(a => a.id === asset.id);
-  
-  if (index >= 0) list[index] = asset;
-  else list.push(asset);
-  
-  saveList(KEYS.ASSETS, list);
-  return asset;
-};
-
-export const deleteAsset = async (id: string): Promise<void> => {
-  await sleep(DELAY);
-  const list = getList<Asset>(KEYS.ASSETS);
-  saveList(KEYS.ASSETS, list.filter(a => a.id !== id));
-};
-
-// --- Works (Obras) ---
-
-export const getWorks = async (): Promise<WorkProject[]> => {
-  await sleep(DELAY);
-  return getList<WorkProject>(KEYS.WORKS);
-};
-
-export const saveWork = async (work: WorkProject): Promise<WorkProject> => {
-  await sleep(DELAY);
-  const list = getList<WorkProject>(KEYS.WORKS);
-  const index = list.findIndex(w => w.id === work.id);
-  
-  if (index >= 0) list[index] = work;
-  else list.push(work);
-  
-  saveList(KEYS.WORKS, list);
-  return work;
-};
-
-export const deleteWork = async (id: string): Promise<void> => {
-  await sleep(DELAY);
-  const list = getList<WorkProject>(KEYS.WORKS);
-  saveList(KEYS.WORKS, list.filter(w => w.id !== id));
-};
+// Works
+export const getWorks = () => getCollection<WorkProject>('works', KEYS.WORKS);
+export const saveWork = (w: WorkProject) => saveItem('works', KEYS.WORKS, w);
+export const deleteWork = (id: string) => deleteItem('works', KEYS.WORKS, id);
 
 // --- Seed ---
 
 export const seedDatabase = async () => {
-  const sectors = getList<Sector>(KEYS.SECTORS);
+  const sectors = await getSectors();
+  
   if (sectors.length === 0) {
     const defaultSectors: Sector[] = [
       { id: 'SEDE', name: 'Sede Principal' },
       { id: 'SETOR_1', name: 'Setor 1' },
       { id: 'SETOR_2', name: 'Setor 2' }
     ];
-    saveList(KEYS.SECTORS, defaultSectors);
+    
+    if (isFirebaseInitialized) {
+        for (const s of defaultSectors) await setDoc(doc(db, 'sectors', s.id), s);
+    } else {
+        saveListLocal(KEYS.SECTORS, defaultSectors);
+    }
   }
   
-  // Create default admin if none exists
-  const users = getList(KEYS.USERS);
+  const users = await getUsers();
   if (users.length === 0) {
       const defaultAdmin = {
           name: 'Administrador',
           email: 'admin@igreja.com',
           password: 'admin' 
       };
-      saveList(KEYS.USERS, [defaultAdmin]);
+      if (isFirebaseInitialized) {
+          await addDoc(collection(db, 'users'), defaultAdmin);
+      } else {
+          saveListLocal(KEYS.USERS, [defaultAdmin]);
+      }
   }
 };
