@@ -1,10 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  enableIndexedDbPersistence, 
-  initializeFirestore, 
-  CACHE_SIZE_UNLIMITED 
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
@@ -21,29 +16,13 @@ let isFirebaseInitialized = false;
 
 try {
     const app = initializeApp(firebaseConfig);
-    
-    // Inicializa o Firestore com configurações de cache ilimitado para melhor suporte offline
-    db = initializeFirestore(app, {
-      cacheSizeBytes: CACHE_SIZE_UNLIMITED
-    });
-
-    // Habilita persistência offline (funciona como o LocalStorage, mas sincroniza quando tem internet)
-    enableIndexedDbPersistence(db)
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-           // Múltiplas abas abertas podem bloquear a persistência
-           console.warn('Persistência offline falhou: Múltiplas abas abertas. Feche outras abas do app.');
-        } else if (err.code == 'unimplemented') {
-           console.warn('O navegador atual não suporta persistência offline.');
-        }
-      });
-      
+    // Inicialização simples e robusta do Firestore
+    db = getFirestore(app);
     isFirebaseInitialized = true;
-    console.log("Firebase conectado com sucesso!");
-    
+    console.log("Firebase inicializado com sucesso.");
 } catch (error) {
-  console.error("Erro ao inicializar Firebase:", error);
-  // O app continuará funcionando, mas cairá no fallback de LocalStorage definido no storage.ts
+  console.error("ERRO CRÍTICO: Falha ao conectar no Firebase:", error);
+  // O app continuará funcionando via LocalStorage se o Firebase falhar
 }
 
 export { db, isFirebaseInitialized };

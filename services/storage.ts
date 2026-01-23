@@ -48,15 +48,18 @@ const saveListLocal = (key: string, list: any[]) => {
 
 export const registerUser = async (user: User & { password: string }): Promise<boolean> => {
   if (isFirebaseInitialized) {
-     // Em um app real, usariamos Firebase Auth. 
-     // Aqui, simularemos usando uma coleção 'users' no Firestore para manter compatibilidade simples.
-     const q = query(collection(db, 'users'), where("email", "==", user.email));
-     const querySnapshot = await getDocs(q);
-     if (!querySnapshot.empty) return false;
+     try {
+         const q = query(collection(db, 'users'), where("email", "==", user.email));
+         const querySnapshot = await getDocs(q);
+         if (!querySnapshot.empty) return false;
 
-     await addDoc(collection(db, 'users'), user);
-     localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
-     return true;
+         await addDoc(collection(db, 'users'), user);
+         localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
+         return true;
+     } catch (e) {
+         console.error("Erro ao registrar usuário no Firebase:", e);
+         return false;
+     }
   } else {
     await sleep(DELAY);
     const users = getListLocal<User & { password: string }>(KEYS.USERS);
@@ -70,15 +73,20 @@ export const registerUser = async (user: User & { password: string }): Promise<b
 
 export const loginUser = async (email: string, password: string): Promise<User | null> => {
   if (isFirebaseInitialized) {
-      const q = query(collection(db, 'users'), where("email", "==", email), where("password", "==", password));
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-          const userData = querySnapshot.docs[0].data() as User;
-          const sessionUser = { email: userData.email, name: userData.name };
-          localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: sessionUser }));
-          return sessionUser;
+      try {
+          const q = query(collection(db, 'users'), where("email", "==", email), where("password", "==", password));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+              const userData = querySnapshot.docs[0].data() as User;
+              const sessionUser = { email: userData.email, name: userData.name };
+              localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: sessionUser }));
+              return sessionUser;
+          }
+          return null;
+      } catch (e) {
+          console.error("Erro no login Firebase:", e);
+          return null;
       }
-      return null;
   } else {
     await sleep(DELAY);
     const users = getListLocal<User & { password: string }>(KEYS.USERS);
@@ -103,8 +111,13 @@ export const getCurrentSession = async () => {
 
 export const getUsers = async (): Promise<User[]> => {
     if (isFirebaseInitialized) {
-        const snapshot = await getDocs(collection(db, 'users'));
-        return snapshot.docs.map(d => ({ name: d.data().name, email: d.data().email }));
+        try {
+            const snapshot = await getDocs(collection(db, 'users'));
+            return snapshot.docs.map(d => ({ name: d.data().name, email: d.data().email }));
+        } catch (e) {
+            console.error("Erro ao buscar usuários:", e);
+            return [];
+        }
     } else {
         return getListLocal<User>(KEYS.USERS).map(u => ({ name: u.name, email: u.email }));
     }
@@ -125,8 +138,13 @@ export const deleteUser = async (email: string): Promise<void> => {
 
 const getCollection = async <T>(collectionName: string, localKey: string): Promise<T[]> => {
     if (isFirebaseInitialized) {
-        const snapshot = await getDocs(collection(db, collectionName));
-        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as unknown as T[];
+        try {
+            const snapshot = await getDocs(collection(db, collectionName));
+            return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as unknown as T[];
+        } catch (e) {
+            console.error(`Erro ao buscar coleção ${collectionName}:`, e);
+            return [];
+        }
     } else {
         await sleep(DELAY);
         return getListLocal<T>(localKey);
@@ -135,9 +153,14 @@ const getCollection = async <T>(collectionName: string, localKey: string): Promi
 
 const saveItem = async <T extends { id: string }>(collectionName: string, localKey: string, item: T): Promise<T> => {
     if (isFirebaseInitialized) {
-        // Use setDoc with the specific ID to ensure IDs are consistent or update existing
-        await setDoc(doc(db, collectionName, item.id), item);
-        return item;
+        try {
+            // Use setDoc with the specific ID to ensure IDs are consistent or update existing
+            await setDoc(doc(db, collectionName, item.id), item);
+            return item;
+        } catch (e) {
+            console.error(`Erro ao salvar em ${collectionName}:`, e);
+            throw e; // Propagate error so UI knows it failed
+        }
     } else {
         await sleep(DELAY);
         const list = getListLocal<T>(localKey);
@@ -151,7 +174,11 @@ const saveItem = async <T extends { id: string }>(collectionName: string, localK
 
 const deleteItem = async (collectionName: string, localKey: string, id: string): Promise<void> => {
     if (isFirebaseInitialized) {
-        await deleteDoc(doc(db, collectionName, id));
+        try {
+            await deleteDoc(doc(db, collectionName, id));
+        } catch (e) {
+            console.error(`Erro ao deletar de ${collectionName}:`, e);
+        }
     } else {
         await sleep(DELAY);
         const list = getListLocal<any>(localKey);
@@ -165,10 +192,6 @@ const deleteItem = async (collectionName: string, localKey: string, id: string):
 export const getSectors = () => getCollection<Sector>('sectors', KEYS.SECTORS);
 export const saveSectors = async (sectors: Sector[]) => {
     if (isFirebaseInitialized) {
-        // Replace strategy implies deleting all and rewriting, but Firestore is document based.
-        // For simplicity in this "settings" context, we'll update them one by one or managing a single doc if it was a config.
-        // But since we use array locally, let's just loop save. 
-        // NOTE: Deleting removed sectors is harder here without a proper sync logic.
         // Simplified: Save all current.
         for (const s of sectors) {
             await setDoc(doc(db, 'sectors', s.id), s);
@@ -231,7 +254,9 @@ export const seedDatabase = async () => {
           password: 'admin' 
       };
       if (isFirebaseInitialized) {
-          await addDoc(collection(db, 'users'), defaultAdmin);
+          try {
+             await addDoc(collection(db, 'users'), defaultAdmin);
+          } catch(e) { console.error("Erro no seed de usuário", e); }
       } else {
           saveListLocal(KEYS.USERS, [defaultAdmin]);
       }
