@@ -16,7 +16,8 @@ import {
   Phone,
   Mail,
   Home,
-  Droplets
+  Droplets,
+  Loader2
 } from 'lucide-react';
 import { Member, Role, Sector } from '../types';
 import * as storage from '../services/storage';
@@ -34,6 +35,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [viewingMember, setViewingMember] = useState<Member | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   // State for Delete Confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -101,7 +103,6 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Size check removed as requested
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
@@ -118,6 +119,8 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
       return;
     }
 
+    setIsSaving(true);
+
     const memberToSave: Member = {
       id: editingMember ? editingMember.id : crypto.randomUUID(),
       fullName: formData.fullName!,
@@ -128,20 +131,27 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
       baptismDate: formData.baptismDate,
       role: formData.role || Role.MEMBER,
       isTither: formData.isTither || false,
-      sector: formData.sector || 'SEDE', // Default to SEDE if somehow missing
+      sector: formData.sector || 'SEDE', 
       photoUrl: formData.photoUrl,
       createdAt: editingMember ? editingMember.createdAt : new Date().toISOString()
     };
 
-    await storage.saveMember(memberToSave);
-    setIsModalOpen(false);
-    setEditingMember(null);
-    setFormData({ 
-      role: Role.MEMBER, 
-      isTither: false,
-      sector: currentSector === 'ALL' ? 'SEDE' : currentSector
-    });
-    loadMembers();
+    try {
+        await storage.saveMember(memberToSave);
+        setIsModalOpen(false);
+        setEditingMember(null);
+        setFormData({ 
+          role: Role.MEMBER, 
+          isTither: false,
+          sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+        });
+        loadMembers();
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao salvar membro. Verifique sua conexão ou contate o suporte.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   // Filter based on Sector AND Search
@@ -513,7 +523,14 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
 
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Salvar Membro</button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-400 flex items-center gap-2"
+                >
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSaving ? 'Salvando...' : 'Salvar Membro'}
+                </button>
               </div>
             </form>
           </div>

@@ -28,7 +28,14 @@ const KEYS = {
   WORKS: 'app_works'
 };
 
-// --- Helpers para LocalStorage ---
+// --- Helpers ---
+
+// Helper crucial para o Firebase: Remove campos 'undefined' do objeto
+// O Firestore lança erro se receber { campo: undefined }
+const sanitizeData = (data: any) => {
+  return JSON.parse(JSON.stringify(data));
+};
+
 const getListLocal = <T>(key: string): T[] => {
   try {
     const data = localStorage.getItem(key);
@@ -53,7 +60,7 @@ export const registerUser = async (user: User & { password: string }): Promise<b
          const querySnapshot = await getDocs(q);
          if (!querySnapshot.empty) return false;
 
-         await addDoc(collection(db, 'users'), user);
+         await addDoc(collection(db, 'users'), sanitizeData(user));
          localStorage.setItem(KEYS.SESSION, JSON.stringify({ user: { email: user.email, name: user.name } }));
          return true;
      } catch (e) {
@@ -154,12 +161,13 @@ const getCollection = async <T>(collectionName: string, localKey: string): Promi
 const saveItem = async <T extends { id: string }>(collectionName: string, localKey: string, item: T): Promise<T> => {
     if (isFirebaseInitialized) {
         try {
-            // Use setDoc with the specific ID to ensure IDs are consistent or update existing
-            await setDoc(doc(db, collectionName, item.id), item);
+            // Sanitiza os dados para remover undefined
+            const cleanItem = sanitizeData(item);
+            await setDoc(doc(db, collectionName, item.id), cleanItem);
             return item;
         } catch (e) {
             console.error(`Erro ao salvar em ${collectionName}:`, e);
-            throw e; // Propagate error so UI knows it failed
+            throw e; // Propaga o erro para a UI saber que falhou
         }
     } else {
         await sleep(DELAY);
@@ -178,6 +186,7 @@ const deleteItem = async (collectionName: string, localKey: string, id: string):
             await deleteDoc(doc(db, collectionName, id));
         } catch (e) {
             console.error(`Erro ao deletar de ${collectionName}:`, e);
+            throw e;
         }
     } else {
         await sleep(DELAY);
@@ -194,7 +203,7 @@ export const saveSectors = async (sectors: Sector[]) => {
     if (isFirebaseInitialized) {
         // Simplified: Save all current.
         for (const s of sectors) {
-            await setDoc(doc(db, 'sectors', s.id), s);
+            await setDoc(doc(db, 'sectors', s.id), sanitizeData(s));
         }
     } else {
         await sleep(DELAY);
@@ -255,7 +264,7 @@ export const seedDatabase = async () => {
       };
       if (isFirebaseInitialized) {
           try {
-             await addDoc(collection(db, 'users'), defaultAdmin);
+             await addDoc(collection(db, 'users'), sanitizeData(defaultAdmin));
           } catch(e) { console.error("Erro no seed de usuário", e); }
       } else {
           saveListLocal(KEYS.USERS, [defaultAdmin]);

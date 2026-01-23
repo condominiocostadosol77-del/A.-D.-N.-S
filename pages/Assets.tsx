@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   MapPin,
   X,
-  Camera
+  Camera,
+  Loader2
 } from 'lucide-react';
 import { Asset, Sector, AssetCondition } from '../types';
 import * as storage from '../services/storage';
@@ -26,6 +27,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Asset>>({
     quantity: 1,
@@ -54,6 +56,8 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
       return;
     }
 
+    setIsSaving(true);
+
     const newAsset: Asset = {
       id: crypto.randomUUID(),
       name: formData.name!,
@@ -68,19 +72,26 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
       createdAt: new Date().toISOString()
     };
 
-    await storage.saveAsset(newAsset);
-    setFormData({
-      quantity: 1,
-      condition: AssetCondition.GOOD,
-      acquisitionDate: new Date().toISOString().split('T')[0],
-      sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
-      name: '',
-      value: 0,
-      description: '',
-      location: ''
-    });
-    setIsModalOpen(false);
-    loadAssets();
+    try {
+        await storage.saveAsset(newAsset);
+        setFormData({
+            quantity: 1,
+            condition: AssetCondition.GOOD,
+            acquisitionDate: new Date().toISOString().split('T')[0],
+            sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
+            name: '',
+            value: 0,
+            description: '',
+            location: ''
+        });
+        setIsModalOpen(false);
+        loadAssets();
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao salvar patrimônio. Verifique sua conexão.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -340,7 +351,14 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
 
                 <div className="pt-4 flex justify-end gap-3">
                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                   <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm">Salvar Bem</button>
+                   <button 
+                     type="submit" 
+                     disabled={isSaving}
+                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2"
+                   >
+                     {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                     {isSaving ? 'Salvando...' : 'Salvar Bem'}
+                   </button>
                 </div>
              </form>
           </div>

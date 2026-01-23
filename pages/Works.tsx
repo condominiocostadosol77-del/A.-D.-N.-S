@@ -11,7 +11,8 @@ import {
   X,
   FileText,
   DollarSign,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { WorkProject, Sector, WorkStatus } from '../types';
 import * as storage from '../services/storage';
@@ -26,6 +27,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState<Partial<WorkProject>>({
     status: WorkStatus.PLANNING,
@@ -54,6 +56,8 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       return;
     }
 
+    setIsSaving(true);
+
     const newWork: WorkProject = {
       id: crypto.randomUUID(),
       title: formData.title!,
@@ -67,18 +71,25 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       createdAt: new Date().toISOString()
     };
 
-    await storage.saveWork(newWork);
-    setFormData({
-      status: WorkStatus.PLANNING,
-      startDate: new Date().toISOString().split('T')[0],
-      sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
-      totalCost: 0,
-      title: '',
-      description: '',
-      responsible: ''
-    });
-    setIsModalOpen(false);
-    loadWorks();
+    try {
+        await storage.saveWork(newWork);
+        setFormData({
+            status: WorkStatus.PLANNING,
+            startDate: new Date().toISOString().split('T')[0],
+            sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
+            totalCost: 0,
+            title: '',
+            description: '',
+            responsible: ''
+        });
+        setIsModalOpen(false);
+        loadWorks();
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao salvar obra. Verifique sua conexão.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -310,7 +321,14 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
                 <div className="pt-4 flex justify-end gap-3">
                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                   <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm">Salvar Registro</button>
+                   <button 
+                     type="submit" 
+                     disabled={isSaving}
+                     className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm flex items-center gap-2"
+                   >
+                     {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                     {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                   </button>
                 </div>
              </form>
           </div>

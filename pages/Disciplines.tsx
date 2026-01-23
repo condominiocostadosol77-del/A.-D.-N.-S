@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   X,
   Printer,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
@@ -25,6 +26,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // State for Delete Confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -72,6 +74,8 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
       return;
     }
 
+    setIsSaving(true);
+
     const selectedMember = members.find(m => m.id === formData.memberId);
 
     const newDiscipline: Discipline = {
@@ -84,9 +88,16 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
       createdAt: new Date().toISOString()
     };
 
-    await storage.saveDiscipline(newDiscipline);
-    closeModal();
-    loadData();
+    try {
+        await storage.saveDiscipline(newDiscipline);
+        closeModal();
+        loadData();
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao registrar disciplina. Verifique sua conexão.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const closeModal = () => {
@@ -426,9 +437,11 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
 
               <button 
                 type="submit" 
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium shadow-sm transition-colors mt-4"
+                disabled={isSaving}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium shadow-sm transition-colors mt-4 flex items-center justify-center gap-2"
               >
-                Registrar Disciplina
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSaving ? 'Salvando...' : 'Registrar Disciplina'}
               </button>
             </form>
           </div>
