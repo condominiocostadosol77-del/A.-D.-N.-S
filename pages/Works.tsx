@@ -12,7 +12,9 @@ import {
   FileText,
   DollarSign,
   Clock,
-  Loader2
+  Loader2,
+  Paperclip,
+  Download
 } from 'lucide-react';
 import { WorkProject, Sector, WorkStatus } from '../types';
 import * as storage from '../services/storage';
@@ -49,6 +51,17 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     return sectors.find(s => s.id === id)?.name || id;
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, receiptUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) {
@@ -68,6 +81,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       totalCost: Number(formData.totalCost) || 0,
       sector: formData.sector || 'SEDE',
       responsible: formData.responsible,
+      receiptUrl: formData.receiptUrl, // Salva a imagem
       createdAt: new Date().toISOString()
     };
 
@@ -80,7 +94,8 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
             totalCost: 0,
             title: '',
             description: '',
-            responsible: ''
+            responsible: '',
+            receiptUrl: undefined
         });
         setIsModalOpen(false);
         loadWorks();
@@ -189,6 +204,19 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        <strong className="block text-xs text-slate-400 uppercase mb-1">Descrição / Detalhes (Ata)</strong>
                        {work.description}
                    </div>
+
+                   {/* Receipt Link */}
+                   {work.receiptUrl && (
+                     <div className="no-print pt-1">
+                        <a 
+                          href={work.receiptUrl} 
+                          download={`recibo-${work.title.replace(/\s+/g, '-').toLowerCase()}`}
+                          className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                           <Paperclip className="w-4 h-4" /> Ver Comprovante/Recibo Anexado
+                        </a>
+                     </div>
+                   )}
                 </div>
 
                 <div className="md:w-64 flex flex-col gap-4 border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
@@ -309,6 +337,19 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        <label className="block text-sm font-medium text-slate-700 mb-1">Data Conclusão (Real ou Prevista)</label>
                        <input type="date" className="w-full p-2 border rounded-lg focus:ring-amber-500"
                         value={formData.endDate || ''} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                   </div>
+                    
+                   <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Anexar Recibo/Nota Fiscal (Opcional)</label>
+                      <div className="flex items-center gap-3">
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleFileUpload} 
+                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition-colors"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Anexe foto de notas fiscais ou comprovantes de pagamento.</p>
                    </div>
 
                    <div className="col-span-2">

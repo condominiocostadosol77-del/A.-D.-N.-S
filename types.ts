@@ -130,5 +130,6 @@ export interface WorkProject {
   totalCost: number;
   sector: string;
   responsible?: string;
+  receiptUrl?: string; // Campo novo para imagem do recibo
   createdAt: string;
 }
