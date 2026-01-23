@@ -1,3 +1,4 @@
+
 export interface Sector {
   id: string;
   name: string;
@@ -28,7 +29,7 @@ export interface Member {
   baptismDate?: string;
   role: Role;
   isTither: boolean;
-  sector: string; // Changed to string to support dynamic IDs
+  sector: string; 
   photoUrl?: string;
   createdAt: string;
 }
@@ -39,13 +40,13 @@ export interface Discipline {
   reason: string;
   startDate: string;
   endDate: string;
-  sector: string; // To filter by sector
+  sector: string;
   createdAt: string;
 }
 
 export enum TransactionType {
-  TITHE = 'Dízimo', // Legacy (kept for safety)
-  TITHE_RECORD = 'Registro de Dízimo', // New checkbox type
+  TITHE = 'Dízimo',
+  TITHE_RECORD = 'Registro de Dízimo',
   OFFERING = 'Oferta',
   SPECIAL_OFFERING = 'Oferta Especial',
   EXPENSE = 'Saída'
@@ -79,11 +80,55 @@ export interface Transaction {
   responsible?: string;
   paymentMethod?: PaymentMethod;
   pixDestination?: string;
-  sector: string; // Changed to string to support dynamic IDs
+  sector: string;
   createdAt: string;
 }
 
 export interface User {
   email: string;
   name: string;
+}
+
+// --- NEW TYPES FOR ASSETS & WORKS ---
+
+export enum AssetCondition {
+  NEW = 'Novo',
+  GOOD = 'Bom',
+  FAIR = 'Regular',
+  POOR = 'Ruim/Danificado',
+  DISCARDED = 'Baixado/Descartado'
+}
+
+export interface Asset {
+  id: string;
+  name: string;
+  description?: string;
+  acquisitionDate: string;
+  value: number;
+  quantity: number;
+  condition: AssetCondition;
+  location: string; // Specific room or detail within sector
+  sector: string;
+  photoUrl?: string;
+  createdAt: string;
+}
+
+export enum WorkStatus {
+  PLANNING = 'Planejamento',
+  IN_PROGRESS = 'Em Andamento',
+  COMPLETED = 'Concluída',
+  PAUSED = 'Paralisada'
+}
+
+export interface WorkProject {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate?: string;
+  status: WorkStatus;
+  totalCost: number;
+  sector: string;
+  responsible?: string;
+  createdAt: string;
 }

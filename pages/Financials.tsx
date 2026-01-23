@@ -146,11 +146,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Basic size check
-      if (file.size > 1048576) { 
-         alert('A imagem do comprovante é muito grande. Use arquivos menores que 1MB.');
-         return;
-      }
+      // Size check removed as requested
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, receiptUrl: reader.result as string }));

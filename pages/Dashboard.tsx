@@ -3,8 +3,7 @@ import {
   Users, 
   AlertCircle,
   Printer,
-  PieChart as PieChartIcon,
-  CheckCircle2
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { 
     PieChart,
@@ -48,8 +47,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
   
   const { 
       filteredMembers, 
-      activeDisciplinesCount,
-      totalTithers
+      activeDisciplinesCount
   } = useMemo(() => {
       // Filter Members
       const fMembers = currentSector === 'ALL' 
@@ -64,13 +62,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           return (currentSector === 'ALL' || d.sector === currentSector) && end >= now;
       });
 
-      // Tithers Logic (Static Count only)
-      const tithersCount = fMembers.filter(m => m.isTither).length;
-
       return {
           filteredMembers: fMembers,
-          activeDisciplinesCount: activeDiscs.length,
-          totalTithers: tithersCount
+          activeDisciplinesCount: activeDiscs.length
       };
   }, [members, disciplines, currentSector]);
 
@@ -139,7 +133,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card 
           title="Total de Membros" 
           value={filteredMembers.length} 
@@ -153,13 +147,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentSector, sectors }) => {
           icon={AlertCircle} 
           color="text-red-500" 
           subtext="Membros sob disciplina eclesiástica ativa"
-        />
-        <Card 
-          title="Total de Dizimistas" 
-          value={totalTithers} 
-          icon={CheckCircle2} 
-          color="text-emerald-600"
-          subtext="Membros marcados como dizimistas no cadastro"
         />
       </div>
 

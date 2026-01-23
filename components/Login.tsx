@@ -34,7 +34,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         });
 
         if (success) {
-          // Auto login on successful registration
           onLogin(email);
         } else {
           setError('Este email já está cadastrado.');
@@ -83,6 +82,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
         
         <div className="p-8 flex-1">
+          {/* Default Login Hint */}
+          {!isRegistering && (
+             <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
+                <p className="font-bold mb-1">Acesso Padrão:</p>
+                <p>Email: <strong>admin@igreja.com</strong></p>
+                <p>Senha: <strong>admin</strong></p>
+             </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegistering && (
               <div className="animate-fade-in-down">

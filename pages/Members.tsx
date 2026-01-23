@@ -101,11 +101,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limit increased to 1MB (1024 * 1024 bytes)
-      if (file.size > 1048576) { 
-        alert('A imagem é muito grande. Por favor, escolha uma imagem menor que 1MB.');
-        return;
-      }
+      // Size check removed as requested
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));

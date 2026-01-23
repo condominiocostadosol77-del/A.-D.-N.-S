@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import Settings from './pages/Settings';
 import Disciplines from './pages/Disciplines';
+import Assets from './pages/Assets';
+import Works from './pages/Works';
 import * as storage from './services/storage';
 import { Sector } from './types';
 
@@ -18,26 +20,28 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-        // Check Supabase session
-        const session = await storage.getCurrentSession();
-        if (session && session.user) {
-          setUserEmail(session.user.email || '');
-          setIsAuthenticated(true);
-        }
+        try {
+            // Check session
+            const session = await storage.getCurrentSession();
+            if (session && session.user) {
+              setUserEmail(session.user.email || '');
+              setIsAuthenticated(true);
+            }
 
-        // Seed if necessary (checks empty tables)
-        await storage.seedDatabase();
-        
-        // Load sectors if authenticated
-        if (session) {
+            // Seed if necessary (checks empty tables)
+            await storage.seedDatabase();
+            
+            // Load sectors
             const loadedSectors = await storage.getSectors();
             setSectors(loadedSectors);
+        } catch (error) {
+            console.error("Erro na inicialização:", error);
+        } finally {
+            setLoading(false);
         }
-        
-        setLoading(false);
     }
     init();
-  }, [isAuthenticated]); // Reload when auth state changes
+  }, [isAuthenticated]);
 
   const handleLogin = async (email: string) => {
     setUserEmail(email);
@@ -57,7 +61,14 @@ const App: React.FC = () => {
       setSectors(newSectors);
   }
 
-  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-emerald-600 font-medium">Carregando sistema...</div>;
+  if (loading) {
+      return (
+          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 gap-3">
+              <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-emerald-700 font-medium animate-pulse">Iniciando sistema...</p>
+          </div>
+      );
+  }
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -68,6 +79,8 @@ const App: React.FC = () => {
       case 'dashboard': return <Dashboard currentSector={currentSector} sectors={sectors} />;
       case 'members': return <Members currentSector={currentSector} sectors={sectors} />;
       case 'disciplines': return <Disciplines currentSector={currentSector} sectors={sectors} />;
+      case 'assets': return <Assets currentSector={currentSector} sectors={sectors} />;
+      case 'works': return <Works currentSector={currentSector} sectors={sectors} />;
       case 'settings': return <Settings sectors={sectors} onUpdateSectors={handleUpdateSectors} currentUserEmail={userEmail} />;
       default: return <Dashboard currentSector={currentSector} sectors={sectors} />;
     }

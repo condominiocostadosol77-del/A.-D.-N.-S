@@ -8,7 +8,9 @@ import {
   Church,
   MapPin,
   Settings,
-  Gavel
+  Gavel,
+  Package,
+  Hammer
 } from 'lucide-react';
 import { Sector } from '../types';
 
@@ -39,6 +41,8 @@ const Layout: React.FC<LayoutProps> = ({
     { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'members', label: 'Membros', icon: Users },
     { id: 'disciplines', label: 'Disciplina', icon: Gavel },
+    { id: 'assets', label: 'Patrimônio', icon: Package },
+    { id: 'works', label: 'Obras/Reformas', icon: Hammer },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
