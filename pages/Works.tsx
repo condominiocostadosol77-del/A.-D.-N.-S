@@ -199,10 +199,10 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         {filteredWorks.length > 0 ? (
            filteredWorks.map(work => (
              <div key={work.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid">
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-3 min-w-0">
                    <div className="flex items-start justify-between">
                        <div>
-                           <h3 className="text-xl font-bold text-slate-800">{work.title}</h3>
+                           <h3 className="text-xl font-bold text-slate-800 break-words">{work.title}</h3>
                            <div className="flex items-center gap-2 mt-1">
                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(work.status)}`}>
                                    {work.status}
@@ -214,7 +214,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        </div>
                    </div>
                    
-                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap">
+                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap break-words max-w-full">
                        <strong className="block text-xs text-slate-400 uppercase mb-1">Descrição / Detalhes (Ata)</strong>
                        {work.description}
                    </div>
