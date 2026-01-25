@@ -205,7 +205,19 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        {work.description}
                    </div>
 
-                   {/* Receipt Link */}
+                   {/* Receipt Image for Printing */}
+                   {work.receiptUrl && (
+                     <div className="hidden print:block mt-4 pt-2 border-t border-dashed border-slate-300">
+                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Imagem do Comprovante / Recibo:</p>
+                        <img 
+                            src={work.receiptUrl} 
+                            alt="Comprovante" 
+                            className="max-w-full max-h-[400px] object-contain border border-slate-200 bg-white rounded" 
+                        />
+                     </div>
+                   )}
+
+                   {/* Receipt Link (Screen only) */}
                    {work.receiptUrl && (
                      <div className="no-print pt-1">
                         <a 
