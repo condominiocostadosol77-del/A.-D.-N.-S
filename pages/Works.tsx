@@ -14,7 +14,7 @@ import {
   Clock,
   Loader2,
   Paperclip,
-  Download
+  Edit2
 } from 'lucide-react';
 import { WorkProject, Sector, WorkStatus } from '../types';
 import * as storage from '../services/storage';
@@ -28,8 +28,10 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   const [works, setWorks] = useState<WorkProject[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<WorkProject>>({
     status: WorkStatus.PLANNING,
@@ -49,6 +51,28 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
+  };
+
+  const handleEdit = (work: WorkProject) => {
+    setEditingId(work.id);
+    setFormData(work);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({
+        status: WorkStatus.PLANNING,
+        startDate: new Date().toISOString().split('T')[0],
+        sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
+        totalCost: 0,
+        title: '',
+        description: '',
+        responsible: '',
+        receiptUrl: undefined,
+        endDate: undefined
+    });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,7 +96,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     setIsSaving(true);
 
     const newWork: WorkProject = {
-      id: crypto.randomUUID(),
+      id: editingId ? editingId : crypto.randomUUID(),
       title: formData.title!,
       description: formData.description || '',
       startDate: formData.startDate!,
@@ -82,22 +106,12 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       sector: formData.sector || 'SEDE',
       responsible: formData.responsible,
       receiptUrl: formData.receiptUrl, // Salva a imagem
-      createdAt: new Date().toISOString()
+      createdAt: editingId && formData.createdAt ? formData.createdAt : new Date().toISOString()
     };
 
     try {
         await storage.saveWork(newWork);
-        setFormData({
-            status: WorkStatus.PLANNING,
-            startDate: new Date().toISOString().split('T')[0],
-            sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
-            totalCost: 0,
-            title: '',
-            description: '',
-            responsible: '',
-            receiptUrl: undefined
-        });
-        setIsModalOpen(false);
+        closeModal();
         loadWorks();
     } catch (error) {
         console.error(error);
@@ -131,7 +145,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
   return (
     <div className="space-y-6">
-      {/* Print Header */}
       <div className="print-header hidden">
         <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p>Relatório de Obras e Reformas - {getSectorName(currentSector)}</p>
@@ -157,7 +170,10 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                 Imprimir Relatório
             </button>
             <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                    closeModal();
+                    setIsModalOpen(true);
+                }}
                 className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
             >
                 <Plus className="w-4 h-4" />
@@ -166,7 +182,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Search */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -180,7 +195,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* List */}
       <div className="grid grid-cols-1 gap-6">
         {filteredWorks.length > 0 ? (
            filteredWorks.map(work => (
@@ -205,7 +219,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        {work.description}
                    </div>
 
-                   {/* Receipt Image for Printing */}
                    {work.receiptUrl && (
                      <div className="hidden print:block mt-4 pt-2 border-t border-dashed border-slate-300">
                         <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Imagem do Comprovante / Recibo:</p>
@@ -217,7 +230,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                      </div>
                    )}
 
-                   {/* Receipt Link (Screen only) */}
                    {work.receiptUrl && (
                      <div className="no-print pt-1">
                         <a 
@@ -252,7 +264,13 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                         </div>
                     </div>
 
-                    <div className="mt-auto pt-2 flex justify-end no-print">
+                    <div className="mt-auto pt-2 flex justify-end no-print gap-1">
+                        <button 
+                            onClick={() => handleEdit(work)}
+                            className="text-slate-400 hover:text-emerald-600 text-sm flex items-center gap-1 hover:bg-emerald-50 px-2 py-1 rounded transition-colors"
+                        >
+                            <Edit2 className="w-4 h-4" /> Editar
+                        </button>
                         <button 
                             onClick={() => setDeleteId(work.id)} 
                             className="text-slate-400 hover:text-red-500 text-sm flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition-colors"
@@ -271,7 +289,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         )}
       </div>
 
-      {/* Delete Modal */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
             <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
@@ -288,13 +305,12 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       )}
 
-      {/* Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-               <h3 className="text-xl font-bold text-slate-800">Registrar Obra/Reforma</h3>
-               <button onClick={() => setIsModalOpen(false)}><X className="w-6 h-6 text-slate-400" /></button>
+               <h3 className="text-xl font-bold text-slate-800">{editingId ? 'Editar Obra' : 'Registrar Obra/Reforma'}</h3>
+               <button onClick={closeModal}><X className="w-6 h-6 text-slate-400" /></button>
              </div>
              
              <form onSubmit={handleSave} className="p-6 space-y-4">
@@ -373,14 +389,14 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3">
-                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                   <button type="button" onClick={closeModal} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
                    <button 
                      type="submit" 
                      disabled={isSaving}
                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm flex items-center gap-2"
                    >
                      {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                     {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                     {isSaving ? 'Salvando...' : (editingId ? 'Atualizar Obra' : 'Salvar Registro')}
                    </button>
                 </div>
              </form>

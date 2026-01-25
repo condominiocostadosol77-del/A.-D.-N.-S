@@ -7,12 +7,11 @@ import {
   Printer, 
   Tag,
   DollarSign,
-  Calendar,
   AlertTriangle,
-  MapPin,
   X,
   Camera,
-  Loader2
+  Loader2,
+  Edit2
 } from 'lucide-react';
 import { Asset, Sector, AssetCondition } from '../types';
 import * as storage from '../services/storage';
@@ -26,8 +25,10 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<Asset>>({
     quantity: 1,
@@ -49,6 +50,28 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     return sectors.find(s => s.id === id)?.name || id;
   };
 
+  const handleEdit = (asset: Asset) => {
+    setEditingId(asset.id);
+    setFormData(asset);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({
+        quantity: 1,
+        condition: AssetCondition.GOOD,
+        acquisitionDate: new Date().toISOString().split('T')[0],
+        sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
+        name: '',
+        value: 0,
+        description: '',
+        location: '',
+        photoUrl: undefined
+    });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.value) {
@@ -59,7 +82,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     setIsSaving(true);
 
     const newAsset: Asset = {
-      id: crypto.randomUUID(),
+      id: editingId ? editingId : crypto.randomUUID(),
       name: formData.name!,
       description: formData.description || '',
       acquisitionDate: formData.acquisitionDate || new Date().toISOString(),
@@ -69,22 +92,12 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
       location: formData.location || '',
       sector: formData.sector || 'SEDE',
       photoUrl: formData.photoUrl,
-      createdAt: new Date().toISOString()
+      createdAt: editingId && formData.createdAt ? formData.createdAt : new Date().toISOString()
     };
 
     try {
         await storage.saveAsset(newAsset);
-        setFormData({
-            quantity: 1,
-            condition: AssetCondition.GOOD,
-            acquisitionDate: new Date().toISOString().split('T')[0],
-            sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
-            name: '',
-            value: 0,
-            description: '',
-            location: ''
-        });
-        setIsModalOpen(false);
+        closeModal();
         loadAssets();
     } catch (error) {
         console.error(error);
@@ -105,7 +118,6 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Size limit removed as requested
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
@@ -123,7 +135,6 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
 
   return (
     <div className="space-y-6">
-      {/* Print Header */}
       <div className="print-header hidden">
         <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p>Relatório de Patrimônio - {getSectorName(currentSector)}</p>
@@ -149,7 +160,10 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                 Imprimir Relatório
             </button>
             <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                    closeModal();
+                    setIsModalOpen(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
             >
                 <Plus className="w-4 h-4" />
@@ -158,7 +172,6 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Search */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -172,7 +185,6 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -230,12 +242,22 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                          R$ {(asset.value * asset.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                      </td>
                      <td className="px-6 py-3 text-right no-print">
-                        <button 
-                           onClick={() => setDeleteId(asset.id)}
-                           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                            <button 
+                            onClick={() => handleEdit(asset)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full"
+                            title="Editar"
+                            >
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                            onClick={() => setDeleteId(asset.id)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                            title="Excluir"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
                      </td>
                    </tr>
                  ))
@@ -251,7 +273,6 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Delete Modal */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
             <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
@@ -268,13 +289,12 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
         </div>
       )}
 
-      {/* Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-               <h3 className="text-xl font-bold text-slate-800">Novo Item de Patrimônio</h3>
-               <button onClick={() => setIsModalOpen(false)}><X className="w-6 h-6 text-slate-400" /></button>
+               <h3 className="text-xl font-bold text-slate-800">{editingId ? 'Editar Item' : 'Novo Item de Patrimônio'}</h3>
+               <button onClick={closeModal}><X className="w-6 h-6 text-slate-400" /></button>
              </div>
              
              <form onSubmit={handleSave} className="p-6 space-y-4">
@@ -350,14 +370,14 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3">
-                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                   <button type="button" onClick={closeModal} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
                    <button 
                      type="submit" 
                      disabled={isSaving}
                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2"
                    >
                      {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                     {isSaving ? 'Salvando...' : 'Salvar Bem'}
+                     {isSaving ? 'Salvando...' : (editingId ? 'Atualizar Bem' : 'Salvar Bem')}
                    </button>
                 </div>
              </form>

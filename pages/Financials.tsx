@@ -3,12 +3,12 @@ import {
   Transaction, 
   Member, 
   TransactionType, 
-  ExpenseCategory,
-  PaymentMethod,
-  Sector
+  ExpenseCategory, 
+  PaymentMethod, 
+  Sector 
 } from '../types';
 import * as storage from '../services/storage';
-import { Plus, Trash2, FileText, Download, Search, AlertTriangle, MapPin, Printer, Loader2 } from 'lucide-react';
+import { Plus, Trash2, FileText, Search, AlertTriangle, Printer, Loader2, Edit2 } from 'lucide-react';
 
 interface FinancialsProps {
   currentSector: string;
@@ -21,9 +21,10 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for save button
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Delete State
+  // Edit & Delete State
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
   // Form Data
@@ -34,7 +35,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector
   });
 
-  // Helper to get Sector Name
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
   };
@@ -49,15 +49,14 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     }
   };
 
-  // Update form default if sector changes
   useEffect(() => {
-    if(!isModalOpen) {
+    if(!isModalOpen && !editingId) {
       setFormData(prev => ({
         ...prev,
         sector: currentSector === 'ALL' ? 'SEDE' : currentSector
       }));
     }
-  }, [currentSector, isModalOpen]);
+  }, [currentSector, isModalOpen, editingId]);
 
   useEffect(() => {
     loadData();
@@ -70,6 +69,20 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     ]);
     setTransactions(txs.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     setMembers(mems);
+  };
+
+  const handleEdit = (tx: Transaction) => {
+    setEditingId(tx.id);
+    setFormData({
+      ...tx,
+      // Garantir que campos opcionais não sejam null/undefined de forma que quebre o input
+      description: tx.description || '',
+      pixDestination: tx.pixDestination || '',
+      memberId: tx.memberId || '',
+      category: tx.category,
+      paymentMethod: tx.paymentMethod || PaymentMethod.CASH
+    });
+    setIsModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -90,11 +103,10 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         else type = TransactionType.EXPENSE;
 
         const newTx: Transaction = {
-          id: crypto.randomUUID(),
-          type,
+          id: editingId ? editingId : crypto.randomUUID(), // Usa ID existente se editando
+          type: editingId ? (formData.type || type) : type, // Mantém tipo original se editando
           date: formData.date!,
           amount: Number(formData.amount),
-          // Ensure optional fields are undefined if not used, so they don't send garbage
           memberId: (activeTab !== 'expenses' && formData.memberId) ? formData.memberId : undefined,
           description: formData.description || undefined,
           category: (activeTab === 'expenses') ? formData.category : undefined,
@@ -102,31 +114,34 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
           paymentMethod: (activeTab !== 'expenses') ? formData.paymentMethod : undefined,
           pixDestination: (formData.paymentMethod === PaymentMethod.PIX) ? formData.pixDestination : undefined,
           sector: formData.sector || 'SEDE',
-          createdAt: new Date().toISOString()
+          createdAt: editingId && formData.createdAt ? formData.createdAt : new Date().toISOString()
         };
 
         await storage.saveTransaction(newTx);
         
-        // Success
-        setIsModalOpen(false);
-        // Reset form but keep date and current sector
-        setFormData({ 
-          date: formData.date, 
-          amount: 0, 
-          paymentMethod: PaymentMethod.CASH,
-          description: '',
-          pixDestination: '',
-          memberId: '',
-          sector: currentSector === 'ALL' ? 'SEDE' : currentSector
-        });
+        closeModal();
         loadData();
 
     } catch (error) {
         console.error("Erro ao salvar:", error);
-        alert("Ocorreu um erro ao salvar o registro.\n\nVerifique se as tabelas do banco de dados foram criadas corretamente (Execute o código SQL no Supabase).");
+        alert("Ocorreu um erro ao salvar o registro.");
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({ 
+      date: new Date().toISOString().split('T')[0], 
+      amount: 0, 
+      paymentMethod: PaymentMethod.CASH,
+      description: '',
+      pixDestination: '',
+      memberId: '',
+      sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+    });
   };
 
   const requestDelete = (e: React.MouseEvent, id: string) => {
@@ -146,7 +161,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Size check removed as requested
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, receiptUrl: reader.result as string }));
@@ -161,9 +175,8 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     return `${day}/${month}/${year}`;
   };
 
-  // Filter based on active tab, search term, AND SECTOR
   const displayedTransactions = transactions
-    .filter(t => currentSector === 'ALL' || t.sector === currentSector) // Sector filter
+    .filter(t => currentSector === 'ALL' || t.sector === currentSector)
     .filter(t => {
       let matchesTab = false;
       if (activeTab === 'tithes') matchesTab = t.type === TransactionType.TITHE;
@@ -173,7 +186,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
 
       if (!matchesTab) return false;
 
-      // Search filter
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const memberName = t.memberId ? members.find(m => m.id === t.memberId)?.fullName.toLowerCase() : '';
@@ -181,7 +193,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         const date = formatDate(t.date);
         return memberName.includes(term) || desc.includes(term) || date.includes(term);
       }
-      
       return true;
     });
 
@@ -189,7 +200,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
 
   return (
     <div className="space-y-6">
-      {/* Print Header */}
       <div className="print-header hidden">
         <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p>{getTabLabel()} - {getSectorName(currentSector)}</p>
@@ -208,7 +218,16 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
              <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Imprimir / PDF</span>
            </button>
            <button 
-             onClick={() => setIsModalOpen(true)}
+             onClick={() => {
+                setEditingId(null);
+                setFormData({
+                    date: new Date().toISOString().split('T')[0],
+                    amount: 0,
+                    paymentMethod: PaymentMethod.CASH,
+                    sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+                });
+                setIsModalOpen(true);
+             }}
              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"
            >
              <Plus className="w-4 h-4" />
@@ -217,39 +236,25 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto no-print">
-        <button 
-          onClick={() => setActiveTab('tithes')}
-          className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'tithes' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('tithes')} className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'tithes' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>
           Dízimos
           {activeTab === 'tithes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
-        <button 
-          onClick={() => setActiveTab('offerings')}
-          className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'offerings' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('offerings')} className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'offerings' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>
           Ofertas Gerais
           {activeTab === 'offerings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
-        <button 
-          onClick={() => setActiveTab('special')}
-          className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'special' ? 'text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('special')} className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'special' ? 'text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}>
           Ofertas Especiais
           {activeTab === 'special' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600"></div>}
         </button>
-        <button 
-          onClick={() => setActiveTab('expenses')}
-          className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'expenses' ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('expenses')} className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap ${activeTab === 'expenses' ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'}`}>
           Saídas e Despesas
           {activeTab === 'expenses' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600"></div>}
         </button>
       </div>
 
-      {/* Filter Bar */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 flex items-center gap-3 no-print">
         <Search className="text-slate-400 w-5 h-5" />
         <input 
@@ -261,7 +266,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         />
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -282,7 +286,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                     <th className="px-6 py-3">Comprovante</th>
                   </>
                 )}
-                <th className="px-6 py-3 w-10 no-print">Ações</th>
+                <th className="px-6 py-3 w-20 no-print text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -346,13 +350,22 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                         </>
                       )}
                       <td className="px-6 py-3 text-right no-print">
-                         <button 
-                            onClick={(e) => requestDelete(e, tx.id)} 
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                            title="Excluir Lançamento"
-                         >
-                           <Trash2 className="w-4 h-4" />
-                         </button>
+                         <div className="flex items-center justify-end gap-1">
+                             <button 
+                                onClick={() => handleEdit(tx)}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                                title="Editar Lançamento"
+                             >
+                               <Edit2 className="w-4 h-4" />
+                             </button>
+                             <button 
+                                onClick={(e) => requestDelete(e, tx.id)} 
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                title="Excluir Lançamento"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                         </div>
                       </td>
                     </tr>
                   );
@@ -372,7 +385,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
@@ -403,25 +415,23 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         </div>
       )}
 
-      {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white">
               <h3 className="text-xl font-bold text-slate-800">
-                {activeTab === 'tithes' && 'Novo Dízimo'}
-                {activeTab === 'offerings' && 'Nova Oferta Geral'}
-                {activeTab === 'special' && 'Nova Oferta Especial'}
-                {activeTab === 'expenses' && 'Nova Despesa'}
+                {editingId ? 'Editar Lançamento' : (
+                    activeTab === 'tithes' ? 'Novo Dízimo' :
+                    activeTab === 'offerings' ? 'Nova Oferta Geral' :
+                    activeTab === 'special' ? 'Nova Oferta Especial' : 'Nova Despesa'
+                )}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <span className="text-2xl">&times;</span>
               </button>
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-4">
-              
-              {/* Sector Selection (Always visible, defaults to current view context) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Setor / Localização</label>
                 <select 
@@ -449,7 +459,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                 </div>
               </div>
 
-              {/* Transaction specific fields */}
               {activeTab !== 'expenses' && (
                 <>
                   <div>
@@ -557,7 +566,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Salvando...
                     </>
-                ) : 'Salvar Registro'}
+                ) : (editingId ? 'Atualizar Registro' : 'Salvar Registro')}
               </button>
             </form>
           </div>

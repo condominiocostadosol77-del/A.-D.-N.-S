@@ -11,7 +11,8 @@ import {
   X,
   Printer,
   ChevronDown,
-  Loader2
+  Loader2,
+  Edit2
 } from 'lucide-react';
 import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
@@ -28,7 +29,8 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // State for Delete Confirmation
+  // State for Edit/Delete
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form State
@@ -67,6 +69,16 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     setMembers(loadedMembers);
   };
 
+  const handleEdit = (d: Discipline) => {
+    const member = members.find(m => m.id === d.memberId);
+    setFormData(d);
+    setEditingId(d.id);
+    if (member) {
+      setMemberSearchQuery(member.fullName);
+    }
+    setIsModalOpen(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.memberId || !formData.reason || !formData.startDate || !formData.endDate) {
@@ -79,13 +91,13 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     const selectedMember = members.find(m => m.id === formData.memberId);
 
     const newDiscipline: Discipline = {
-      id: crypto.randomUUID(),
+      id: editingId ? editingId : crypto.randomUUID(),
       memberId: formData.memberId,
       reason: formData.reason,
       startDate: formData.startDate,
       endDate: formData.endDate,
       sector: selectedMember ? selectedMember.sector : 'SEDE',
-      createdAt: new Date().toISOString()
+      createdAt: editingId && formData.createdAt ? formData.createdAt : new Date().toISOString()
     };
 
     try {
@@ -102,6 +114,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setEditingId(null);
     setFormData({ startDate: new Date().toISOString().split('T')[0] });
     setMemberSearchQuery('');
     setShowMemberSuggestions(false);
@@ -159,7 +172,6 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
 
   return (
     <div className="space-y-6">
-      {/* Print Header */}
       <div className="print-header hidden">
         <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p>Relatório Disciplinar - {getSectorName(currentSector)}</p>
@@ -185,7 +197,10 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                 Imprimir / PDF
             </button>
             <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+                closeModal();
+                setIsModalOpen(true);
+            }}
             className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
             >
             <Plus className="w-4 h-4" />
@@ -194,7 +209,6 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
         </div>
       </div>
 
-      {/* Search Filter */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -208,7 +222,6 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
         </div>
       </div>
 
-      {/* Disciplines List */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -268,13 +281,22 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                         )}
                       </td>
                       <td className="px-6 py-3 text-right no-print">
-                         <button 
-                            onClick={() => setDeleteId(d.id)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                            title="Remover Registro"
-                         >
-                           <Trash2 className="w-4 h-4" />
-                         </button>
+                         <div className="flex items-center justify-end gap-1">
+                             <button 
+                                onClick={() => handleEdit(d)}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                                title="Editar Disciplina"
+                             >
+                               <Edit2 className="w-4 h-4" />
+                             </button>
+                             <button 
+                                onClick={() => setDeleteId(d.id)}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                title="Remover Registro"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                         </div>
                       </td>
                     </tr>
                   );
@@ -294,7 +316,6 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
         </div>
       </div>
 
-      {/* Delete Modal */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
@@ -325,12 +346,13 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
         </div>
       )}
 
-      {/* Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl">
-              <h3 className="text-xl font-bold text-slate-800">Nova Disciplina</h3>
+              <h3 className="text-xl font-bold text-slate-800">
+                  {editingId ? 'Editar Disciplina' : 'Nova Disciplina'}
+              </h3>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <X className="w-6 h-6" />
               </button>
@@ -338,7 +360,6 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
             
             <form onSubmit={handleSave} className="p-6 space-y-4">
               
-              {/* Smart Search Dropdown */}
               <div className="relative" ref={dropdownRef}>
                  <label className="block text-sm font-medium text-slate-700 mb-1">Membro</label>
                  <div className="relative">
@@ -350,7 +371,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                       value={memberSearchQuery}
                       onChange={(e) => {
                         setMemberSearchQuery(e.target.value);
-                        setFormData({ ...formData, memberId: '' }); // Clear selection on type
+                        setFormData({ ...formData, memberId: '' }); 
                         setShowMemberSuggestions(true);
                       }}
                       onFocus={() => setShowMemberSuggestions(true)}
@@ -441,7 +462,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium shadow-sm transition-colors mt-4 flex items-center justify-center gap-2"
               >
                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSaving ? 'Salvando...' : 'Registrar Disciplina'}
+                {isSaving ? 'Salvando...' : (editingId ? 'Atualizar Disciplina' : 'Registrar Disciplina')}
               </button>
             </form>
           </div>
