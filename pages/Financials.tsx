@@ -8,7 +8,7 @@ import {
   Sector 
 } from '../types';
 import * as storage from '../services/storage';
-import { Plus, Trash2, FileText, Search, AlertTriangle, Printer, Loader2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, FileText, Search, AlertTriangle, Printer, Loader2, Edit2, CheckSquare, Square } from 'lucide-react';
 
 interface FinancialsProps {
   currentSector: string;
@@ -26,6 +26,10 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   // Edit & Delete State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Form Data
   const [formData, setFormData] = useState<Partial<Transaction>>({
@@ -60,6 +64,8 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
 
   useEffect(() => {
     loadData();
+    // Reset selection when tab changes
+    setSelectedIds(new Set());
   }, [activeTab]);
 
   const loadData = async () => {
@@ -75,7 +81,6 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     setEditingId(tx.id);
     setFormData({
       ...tx,
-      // Garantir que campos opcionais não sejam null/undefined de forma que quebre o input
       description: tx.description || '',
       pixDestination: tx.pixDestination || '',
       memberId: tx.memberId || '',
@@ -103,8 +108,8 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
         else type = TransactionType.EXPENSE;
 
         const newTx: Transaction = {
-          id: editingId ? editingId : crypto.randomUUID(), // Usa ID existente se editando
-          type: editingId ? (formData.type || type) : type, // Mantém tipo original se editando
+          id: editingId ? editingId : crypto.randomUUID(),
+          type: editingId ? (formData.type || type) : type,
           date: formData.date!,
           amount: Number(formData.amount),
           memberId: (activeTab !== 'expenses' && formData.memberId) ? formData.memberId : undefined,
@@ -175,7 +180,31 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     return `${day}/${month}/${year}`;
   };
 
-  const displayedTransactions = transactions
+  // Selection Logic
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === displayedTransactions.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(displayedTransactions.map(t => t.id)));
+    }
+  };
+
+  const handlePrint = () => {
+    if (isSelectionMode && selectedIds.size === 0) {
+        alert("Selecione pelo menos um registro para imprimir.");
+        return;
+    }
+    window.print();
+  };
+
+  const filteredTransactions = transactions
     .filter(t => currentSector === 'ALL' || t.sector === currentSector)
     .filter(t => {
       let matchesTab = false;
@@ -196,6 +225,10 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
       return true;
     });
 
+  const displayedTransactions = isSelectionMode && selectedIds.size > 0
+    ? filteredTransactions.filter(t => selectedIds.has(t.id))
+    : filteredTransactions;
+
   const availableMembersForForm = members.filter(m => m.sector === formData.sector);
 
   return (
@@ -214,25 +247,58 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
           </p>
         </div>
         <div className="flex gap-2 no-print">
-           <button onClick={() => window.print()} className="px-3 py-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 flex items-center gap-2">
-             <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Imprimir / PDF</span>
-           </button>
-           <button 
-             onClick={() => {
-                setEditingId(null);
-                setFormData({
-                    date: new Date().toISOString().split('T')[0],
-                    amount: 0,
-                    paymentMethod: PaymentMethod.CASH,
-                    sector: currentSector === 'ALL' ? 'SEDE' : currentSector
-                });
-                setIsModalOpen(true);
-             }}
-             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"
-           >
-             <Plus className="w-4 h-4" />
-             Novo Lançamento
-           </button>
+            {isSelectionMode ? (
+                <>
+                    <button 
+                        onClick={() => {
+                            setIsSelectionMode(false);
+                            setSelectedIds(new Set());
+                        }}
+                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Selecionados ({selectedIds.size})
+                    </button>
+                </>
+            ) : (
+                <button 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar para Imprimir
+                </button>
+            )}
+
+            {!isSelectionMode && (
+                <>
+                <button onClick={() => window.print()} className="px-3 py-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                    <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Imprimir Tabela</span>
+                </button>
+                <button 
+                    onClick={() => {
+                        setEditingId(null);
+                        setFormData({
+                            date: new Date().toISOString().split('T')[0],
+                            amount: 0,
+                            paymentMethod: PaymentMethod.CASH,
+                            sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+                        });
+                        setIsModalOpen(true);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"
+                >
+                    <Plus className="w-4 h-4" />
+                    Novo Lançamento
+                </button>
+                </>
+            )}
         </div>
       </div>
 
@@ -256,6 +322,19 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 flex items-center gap-3 no-print">
+        {isSelectionMode && (
+            <button 
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+                {selectedIds.size === displayedTransactions.length && displayedTransactions.length > 0 ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                ) : (
+                    <Square className="w-5 h-5 text-slate-400" />
+                )}
+                Todos
+            </button>
+        )}
         <Search className="text-slate-400 w-5 h-5" />
         <input 
           type="text" 
@@ -271,6 +350,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
               <tr>
+                {isSelectionMode && <th className="px-6 py-3 w-10 no-print">#</th>}
                 <th className="px-6 py-3">Data</th>
                 {currentSector === 'ALL' && <th className="px-6 py-3">Setor</th>}
                 <th className="px-6 py-3">Valor</th>
@@ -294,7 +374,18 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                 displayedTransactions.map((tx) => {
                   const memberName = tx.memberId ? members.find(m => m.id === tx.memberId)?.fullName : '-';
                   return (
-                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={tx.id} className={`hover:bg-slate-50 transition-colors ${isSelectionMode && selectedIds.has(tx.id) ? 'bg-emerald-50' : ''}`}>
+                      {isSelectionMode && (
+                        <td className="px-6 py-3 no-print">
+                            <button onClick={() => toggleSelection(tx.id)}>
+                                {selectedIds.has(tx.id) ? (
+                                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                ) : (
+                                    <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                                )}
+                            </button>
+                        </td>
+                      )}
                       <td className="px-6 py-3">{formatDate(tx.date)}</td>
                       {currentSector === 'ALL' && (
                         <td className="px-6 py-3">
@@ -372,7 +463,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={currentSector === 'ALL' ? 7 : 6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={currentSector === 'ALL' ? (isSelectionMode ? 8 : 7) : (isSelectionMode ? 7 : 6)} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <FileText className="w-8 h-8 opacity-20" />
                       <p>Nenhum registro encontrado.</p>
@@ -384,7 +475,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
           </table>
         </div>
       </div>
-
+      {/* Modals are unchanged */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">

@@ -14,7 +14,10 @@ import {
   Clock,
   Loader2,
   Paperclip,
-  Edit2
+  Edit2,
+  CheckSquare,
+  Square,
+  Image as ImageIcon
 } from 'lucide-react';
 import { WorkProject, Sector, WorkStatus } from '../types';
 import * as storage from '../services/storage';
@@ -33,11 +36,16 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   const [formData, setFormData] = useState<Partial<WorkProject>>({
     status: WorkStatus.PLANNING,
     startDate: new Date().toISOString().split('T')[0],
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
-    totalCost: 0
+    totalCost: 0,
+    receiptUrls: []
   });
 
   useEffect(() => {
@@ -55,7 +63,9 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
   const handleEdit = (work: WorkProject) => {
     setEditingId(work.id);
-    setFormData(work);
+    // Compatibilidade: se tiver receiptUrl antigo e não tiver lista, cria lista
+    const images = work.receiptUrls || (work.receiptUrl ? [work.receiptUrl] : []);
+    setFormData({ ...work, receiptUrls: images });
     setIsModalOpen(true);
   };
 
@@ -71,19 +81,32 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         description: '',
         responsible: '',
         receiptUrl: undefined,
+        receiptUrls: [],
         endDate: undefined
     });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, receiptUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((file: any) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData(prev => ({ 
+                ...prev, 
+                receiptUrls: [...(prev.receiptUrls || []), reader.result as string] 
+            }));
+        };
+        reader.readAsDataURL(file);
+      });
     }
+  };
+
+  const removeImage = (index: number) => {
+      setFormData(prev => ({
+          ...prev,
+          receiptUrls: prev.receiptUrls?.filter((_, i) => i !== index)
+      }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -105,7 +128,8 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       totalCost: Number(formData.totalCost) || 0,
       sector: formData.sector || 'SEDE',
       responsible: formData.responsible,
-      receiptUrl: formData.receiptUrl, // Salva a imagem
+      receiptUrl: formData.receiptUrls?.[0], // Legado: salva a primeira imagem no campo antigo
+      receiptUrls: formData.receiptUrls || [], // Novo: salva todas
       createdAt: editingId && formData.createdAt ? formData.createdAt : new Date().toISOString()
     };
 
@@ -129,9 +153,54 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     }
   };
 
+  // Selection Logic
+  const toggleSelection = (id: string) => {
+      const newSet = new Set(selectedIds);
+      if (newSet.has(id)) {
+          newSet.delete(id);
+      } else {
+          newSet.add(id);
+      }
+      setSelectedIds(newSet);
+  };
+
+  const toggleAll = () => {
+      if (selectedIds.size === displayedWorks.length) {
+          setSelectedIds(new Set());
+      } else {
+          setSelectedIds(new Set(displayedWorks.map(w => w.id)));
+      }
+  };
+
+  const handlePrint = () => {
+      if (isSelectionMode && selectedIds.size === 0) {
+          alert("Selecione pelo menos um item para imprimir.");
+          return;
+      }
+      window.print();
+  };
+
   const filteredWorks = works
     .filter(w => currentSector === 'ALL' || w.sector === currentSector)
     .filter(w => w.title.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // Se estiver em modo de seleção e for imprimir (css print media), 
+  // idealmente o React mostraria apenas os selecionados.
+  // Como o CSS print esconde coisas, vamos filtrar a lista visualmente se estivermos imprimindo "selecionados".
+  // Mas a ação de imprimir é externa. 
+  // Estratégia: A lista renderizada obedece a seleção SE o modo de seleção estiver ativo E o usuário clicar em imprimir?
+  // Simplificação: Se o modo de seleção estiver ativo, filtramos a lista renderizada APENAS se houver itens selecionados E estivermos imprimindo?
+  // Não, vamos filtrar a lista renderizada para mostrar apenas os selecionados visualmente quando for imprimir?
+  // O melhor fluxo: 
+  // 1. Seleciona itens.
+  // 2. Clica "Imprimir Selecionados".
+  // 3. O navegador imprime o que está na tela.
+  // 4. Portanto, a tela deve mostrar APENAS o que está selecionado quando for imprimir.
+  
+  // Vamos criar uma lista final para renderizar
+  const displayedWorks = isSelectionMode && selectedIds.size > 0 
+      ? filteredWorks.filter(w => selectedIds.has(w.id))
+      : filteredWorks;
 
   const getStatusColor = (status: WorkStatus) => {
     switch (status) {
@@ -162,28 +231,65 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
           </p>
         </div>
         <div className="flex gap-2 no-print">
-            <button 
-                onClick={() => window.print()} 
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Printer className="w-4 h-4" />
-                Imprimir Relatório
-            </button>
-            <button 
-                onClick={() => {
-                    closeModal();
-                    setIsModalOpen(true);
-                }}
-                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Plus className="w-4 h-4" />
-                Nova Obra
-            </button>
+            {isSelectionMode ? (
+                <>
+                    <button 
+                        onClick={() => {
+                            setIsSelectionMode(false);
+                            setSelectedIds(new Set());
+                        }}
+                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Selecionados ({selectedIds.size})
+                    </button>
+                </>
+            ) : (
+                <button 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar para Imprimir
+                </button>
+            )}
+            
+            {!isSelectionMode && (
+                <button 
+                    onClick={() => {
+                        closeModal();
+                        setIsModalOpen(true);
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                    <Plus className="w-4 h-4" />
+                    Nova Obra
+                </button>
+            )}
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
-        <div className="relative">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex gap-4 items-center">
+        {isSelectionMode && (
+            <button 
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+                {selectedIds.size === displayedWorks.length && displayedWorks.length > 0 ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                ) : (
+                    <Square className="w-5 h-5 text-slate-400" />
+                )}
+                Selecionar Todos
+            </button>
+        )}
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
@@ -196,9 +302,28 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {filteredWorks.length > 0 ? (
-           filteredWorks.map(work => (
-             <div key={work.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid">
+        {displayedWorks.length > 0 ? (
+           displayedWorks.map(work => {
+             // Compatibilidade com legado: cria array se não existir
+             const images = work.receiptUrls && work.receiptUrls.length > 0 
+                ? work.receiptUrls 
+                : (work.receiptUrl ? [work.receiptUrl] : []);
+
+             return (
+             <div key={work.id} className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}>
+                
+                {isSelectionMode && (
+                    <div className="no-print flex items-start pt-1">
+                        <button onClick={() => toggleSelection(work.id)}>
+                            {selectedIds.has(work.id) ? (
+                                <CheckSquare className="w-6 h-6 text-emerald-600" />
+                            ) : (
+                                <Square className="w-6 h-6 text-slate-300 hover:text-slate-400" />
+                            )}
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex-1 space-y-3 min-w-0">
                    <div className="flex items-start justify-between">
                        <div>
@@ -219,26 +344,25 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        {work.description}
                    </div>
 
-                   {work.receiptUrl && (
-                     <div className="hidden print:block mt-4 pt-2 border-t border-dashed border-slate-300">
-                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Imagem do Comprovante / Recibo:</p>
-                        <img 
-                            src={work.receiptUrl} 
-                            alt="Comprovante" 
-                            className="max-w-full max-h-[400px] object-contain border border-slate-200 bg-white rounded" 
-                        />
-                     </div>
-                   )}
-
-                   {work.receiptUrl && (
-                     <div className="no-print pt-1">
-                        <a 
-                          href={work.receiptUrl} 
-                          download={`recibo-${work.title.replace(/\s+/g, '-').toLowerCase()}`}
-                          className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                           <Paperclip className="w-4 h-4" /> Ver Comprovante/Recibo Anexado
-                        </a>
+                   {/* Grid de Imagens para Impressão e Tela */}
+                   {images.length > 0 && (
+                     <div className="mt-4 pt-2 border-t border-dashed border-slate-300">
+                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2">
+                            <ImageIcon className="w-4 h-4" /> Anexos e Comprovantes ({images.length}):
+                        </p>
+                        
+                        {/* Print: Stack images vertically or grid to fit paper */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:block">
+                            {images.map((img, idx) => (
+                                <div key={idx} className="print:mb-4 print:break-inside-avoid">
+                                    <img 
+                                        src={img} 
+                                        alt={`Anexo ${idx + 1}`} 
+                                        className="w-full h-auto max-h-[400px] object-contain border border-slate-200 bg-white rounded" 
+                                    />
+                                </div>
+                            ))}
+                        </div>
                      </div>
                    )}
                 </div>
@@ -280,11 +404,11 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                     </div>
                 </div>
              </div>
-           ))
+           )})
         ) : (
            <div className="bg-white p-12 rounded-xl text-center text-slate-400 border border-slate-100">
                <Hammer className="w-12 h-12 mx-auto mb-3 opacity-20" />
-               <p>Nenhuma obra ou reforma registrada.</p>
+               <p>Nenhuma obra ou reforma encontrada.</p>
            </div>
         )}
       </div>
@@ -368,16 +492,39 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    </div>
                     
                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Anexar Recibo/Nota Fiscal (Opcional)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Anexar Recibos, Notas e Fotos (Múltiplos)</label>
                       <div className="flex items-center gap-3">
-                        <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={handleFileUpload} 
-                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition-colors"
-                        />
+                        <label className="cursor-pointer bg-amber-50 text-amber-700 px-4 py-2 rounded-lg hover:bg-amber-100 transition-colors flex items-center gap-2 text-sm font-medium border border-amber-200">
+                            <Plus className="w-4 h-4" /> Adicionar Arquivos
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                multiple
+                                onChange={handleFileUpload} 
+                                className="hidden"
+                            />
+                        </label>
+                        <span className="text-xs text-slate-400">Suporta múltiplas imagens.</span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">Anexe foto de notas fiscais ou comprovantes de pagamento.</p>
+                      
+                      {/* Galeria de imagens selecionadas no formulário */}
+                      {formData.receiptUrls && formData.receiptUrls.length > 0 && (
+                          <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
+                              {formData.receiptUrls.map((url, index) => (
+                                  <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                                      <img src={url} alt={`Anexo ${index}`} className="w-full h-full object-cover" />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeImage(index)}
+                                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Remover imagem"
+                                      >
+                                          <X className="w-3 h-3" />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
                    </div>
 
                    <div className="col-span-2">

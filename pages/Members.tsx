@@ -17,7 +17,9 @@ import {
   Mail,
   Home,
   Droplets,
-  Loader2
+  Loader2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Member, Role, Sector } from '../types';
 import * as storage from '../services/storage';
@@ -39,6 +41,10 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   
   // State for Delete Confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Form State
   const [formData, setFormData] = useState<Partial<Member>>({
@@ -154,6 +160,31 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
     }
   };
 
+  // Selection Logic
+  const toggleSelection = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === displayedMembers.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(displayedMembers.map(m => m.id)));
+    }
+  };
+
+  const handlePrint = () => {
+    if (isSelectionMode && selectedIds.size === 0) {
+        alert("Selecione pelo menos um membro para imprimir.");
+        return;
+    }
+    window.print();
+  };
+
   // Filter based on Sector AND Search
   const filteredMembers = members
     .filter(m => currentSector === 'ALL' || m.sector === currentSector)
@@ -172,6 +203,19 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
         );
     });
 
+  // Only show selected members if in selection mode and selections exist (logic for what to render)
+  // BUT: We want to see all to select them. We only want to filter during print? 
+  // No, easier UX: user selects, clicks print, browser prints what is on screen.
+  // So we filter the LIST based on selection ONLY if printing? 
+  // Browser print prints the DOM. So we must hide unselected items or filter them out before print call.
+  // Let's filter the rendered list if selection mode is ON and we have items selected?
+  // Actually, standard behavior: Show checkboxes. If user clicks "Print Selected", trigger print.
+  // To make print work with selection, we filter the `displayedMembers` based on selection state.
+  
+  const displayedMembers = isSelectionMode && selectedIds.size > 0 
+      ? filteredMembers.filter(m => selectedIds.has(m.id))
+      : filteredMembers;
+
   return (
     <div className="space-y-6">
       {/* Print Header */}
@@ -189,34 +233,71 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
           </p>
         </div>
         <div className="flex gap-2 no-print">
-            <button 
-                onClick={() => window.print()} 
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Printer className="w-4 h-4" />
-                Imprimir / PDF
-            </button>
-            <button 
-            onClick={() => {
-                setEditingMember(null);
-                setFormData({ 
-                role: Role.MEMBER, 
-                isTither: false,
-                sector: currentSector === 'ALL' ? 'SEDE' : currentSector
-                });
-                setIsModalOpen(true);
-            }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-            <Plus className="w-4 h-4" />
-            Novo Membro
-            </button>
+            {isSelectionMode ? (
+                <>
+                    <button 
+                        onClick={() => {
+                            setIsSelectionMode(false);
+                            setSelectedIds(new Set());
+                        }}
+                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Selecionados ({selectedIds.size})
+                    </button>
+                </>
+            ) : (
+                <button 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar para Imprimir
+                </button>
+            )}
+            
+            {!isSelectionMode && (
+                <button 
+                onClick={() => {
+                    setEditingMember(null);
+                    setFormData({ 
+                    role: Role.MEMBER, 
+                    isTither: false,
+                    sector: currentSector === 'ALL' ? 'SEDE' : currentSector
+                    });
+                    setIsModalOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                <Plus className="w-4 h-4" />
+                Novo Membro
+                </button>
+            )}
         </div>
       </div>
 
       {/* Search Filter */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
-        <div className="relative">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex items-center gap-4">
+        {isSelectionMode && (
+            <button 
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+                {selectedIds.size === displayedMembers.length && displayedMembers.length > 0 ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                ) : (
+                    <Square className="w-5 h-5 text-slate-400" />
+                )}
+                Selecionar Todos
+            </button>
+        )}
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
@@ -230,9 +311,20 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
 
       {/* Members List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMembers.map((member) => (
-          <div key={member.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
-            <div className="p-6 flex items-start gap-4 cursor-pointer" onClick={() => setViewingMember(member)}>
+        {displayedMembers.map((member) => (
+          <div key={member.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow break-inside-avoid ${isSelectionMode && selectedIds.has(member.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}>
+            <div className="p-6 flex items-start gap-4 cursor-pointer" onClick={() => !isSelectionMode && setViewingMember(member)}>
+              
+              {isSelectionMode && (
+                <div onClick={(e) => toggleSelection(e, member.id)} className="pt-1 no-print">
+                    {selectedIds.has(member.id) ? (
+                        <CheckSquare className="w-6 h-6 text-emerald-600" />
+                    ) : (
+                        <Square className="w-6 h-6 text-slate-300 hover:text-slate-400" />
+                    )}
+                </div>
+              )}
+
               <div className="flex-shrink-0">
                 {member.photoUrl ? (
                   <img src={member.photoUrl} alt={member.fullName} className="w-16 h-16 rounded-full object-cover border-2 border-emerald-100" />

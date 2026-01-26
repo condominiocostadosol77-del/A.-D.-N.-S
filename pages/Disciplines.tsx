@@ -12,7 +12,9 @@ import {
   Printer,
   ChevronDown,
   Loader2,
-  Edit2
+  Edit2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
@@ -32,6 +34,10 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
   // State for Edit/Delete
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Form State
   const [formData, setFormData] = useState<Partial<Discipline>>({
@@ -143,6 +149,30 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     return end >= now;
   };
 
+  // Selection Logic
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === displayedDisciplines.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(displayedDisciplines.map(d => d.id)));
+    }
+  };
+
+  const handlePrint = () => {
+    if (isSelectionMode && selectedIds.size === 0) {
+        alert("Selecione pelo menos um item para imprimir.");
+        return;
+    }
+    window.print();
+  };
+
   // Filter based on Sector AND Search (Main List)
   const filteredDisciplines = disciplines
     .filter(d => currentSector === 'ALL' || d.sector === currentSector)
@@ -156,6 +186,10 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
         d.reason.toLowerCase().includes(term)
       );
     });
+
+  const displayedDisciplines = isSelectionMode && selectedIds.size > 0
+    ? filteredDisciplines.filter(d => selectedIds.has(d.id))
+    : filteredDisciplines;
 
   // Filter members for the modal dropdown
   const availableMembers = members.filter(m => currentSector === 'ALL' || m.sector === currentSector);
@@ -189,28 +223,74 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
           </p>
         </div>
         <div className="flex gap-2 no-print">
-            <button 
-                onClick={() => window.print()} 
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Printer className="w-4 h-4" />
-                Imprimir / PDF
-            </button>
-            <button 
-            onClick={() => {
-                closeModal();
-                setIsModalOpen(true);
-            }}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-            <Plus className="w-4 h-4" />
-            Nova Disciplina
-            </button>
+            {isSelectionMode ? (
+                <>
+                    <button 
+                        onClick={() => {
+                            setIsSelectionMode(false);
+                            setSelectedIds(new Set());
+                        }}
+                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Selecionados ({selectedIds.size})
+                    </button>
+                </>
+            ) : (
+                <button 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar para Imprimir
+                </button>
+            )}
+
+            {!isSelectionMode && (
+                <>
+                <button 
+                    onClick={() => window.print()} 
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                    <Printer className="w-4 h-4" />
+                    Imprimir / PDF
+                </button>
+                <button 
+                onClick={() => {
+                    closeModal();
+                    setIsModalOpen(true);
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                <Plus className="w-4 h-4" />
+                Nova Disciplina
+                </button>
+                </>
+            )}
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
-        <div className="relative">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex items-center gap-3">
+        {isSelectionMode && (
+            <button 
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+                {selectedIds.size === displayedDisciplines.length && displayedDisciplines.length > 0 ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                ) : (
+                    <Square className="w-5 h-5 text-slate-400" />
+                )}
+                Todos
+            </button>
+        )}
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
@@ -227,6 +307,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
               <tr>
+                {isSelectionMode && <th className="px-6 py-3 w-10 no-print">#</th>}
                 <th className="px-6 py-3">Membro</th>
                 {currentSector === 'ALL' && <th className="px-6 py-3">Setor</th>}
                 <th className="px-6 py-3">Motivo</th>
@@ -236,13 +317,24 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDisciplines.length > 0 ? (
-                filteredDisciplines.map((d) => {
+              {displayedDisciplines.length > 0 ? (
+                displayedDisciplines.map((d) => {
                   const member = members.find(m => m.id === d.memberId);
                   const isActive = isDisciplineActive(d.endDate);
                   
                   return (
-                    <tr key={d.id} className="hover:bg-slate-50">
+                    <tr key={d.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(d.id) ? 'bg-emerald-50' : ''}`}>
+                      {isSelectionMode && (
+                        <td className="px-6 py-3 no-print">
+                            <button onClick={() => toggleSelection(d.id)}>
+                                {selectedIds.has(d.id) ? (
+                                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                ) : (
+                                    <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                                )}
+                            </button>
+                        </td>
+                      )}
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
@@ -303,7 +395,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                 })
               ) : (
                 <tr>
-                  <td colSpan={currentSector === 'ALL' ? 6 : 5} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={isSelectionMode ? 7 : 6} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <CheckCircle2 className="w-8 h-8 opacity-20 text-emerald-500" />
                       <p>Nenhum membro em disciplina encontrado.</p>
@@ -315,7 +407,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
           </table>
         </div>
       </div>
-
+      {/* Modals unchanged */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">

@@ -11,7 +11,9 @@ import {
   X,
   Camera,
   Loader2,
-  Edit2
+  Edit2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Asset, Sector, AssetCondition } from '../types';
 import * as storage from '../services/storage';
@@ -29,6 +31,10 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState<Partial<Asset>>({
     quantity: 1,
@@ -126,10 +132,38 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     }
   };
 
+  // Selection Logic
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === displayedAssets.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(displayedAssets.map(a => a.id)));
+    }
+  };
+
+  const handlePrint = () => {
+    if (isSelectionMode && selectedIds.size === 0) {
+        alert("Selecione pelo menos um item para imprimir.");
+        return;
+    }
+    window.print();
+  };
+
   const filteredAssets = assets
     .filter(a => currentSector === 'ALL' || a.sector === currentSector)
     .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                  a.description?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const displayedAssets = isSelectionMode && selectedIds.size > 0
+    ? filteredAssets.filter(a => selectedIds.has(a.id))
+    : filteredAssets;
 
   const totalValue = filteredAssets.reduce((acc, curr) => acc + (curr.value * curr.quantity), 0);
 
@@ -152,28 +186,74 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
           </p>
         </div>
         <div className="flex gap-2 no-print">
-            <button 
-                onClick={() => window.print()} 
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Printer className="w-4 h-4" />
-                Imprimir Relatório
-            </button>
-            <button 
-                onClick={() => {
-                    closeModal();
-                    setIsModalOpen(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-            >
-                <Plus className="w-4 h-4" />
-                Novo Item
-            </button>
+            {isSelectionMode ? (
+                <>
+                    <button 
+                        onClick={() => {
+                            setIsSelectionMode(false);
+                            setSelectedIds(new Set());
+                        }}
+                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Selecionados ({selectedIds.size})
+                    </button>
+                </>
+            ) : (
+                <button 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar para Imprimir
+                </button>
+            )}
+
+            {!isSelectionMode && (
+                <>
+                <button 
+                    onClick={() => window.print()} 
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                    <Printer className="w-4 h-4" />
+                    Imprimir Relatório
+                </button>
+                <button 
+                    onClick={() => {
+                        closeModal();
+                        setIsModalOpen(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                    <Plus className="w-4 h-4" />
+                    Novo Item
+                </button>
+                </>
+            )}
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print">
-        <div className="relative">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex items-center gap-3">
+        {isSelectionMode && (
+            <button 
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+                {selectedIds.size === displayedAssets.length && displayedAssets.length > 0 ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                ) : (
+                    <Square className="w-5 h-5 text-slate-400" />
+                )}
+                Todos
+            </button>
+        )}
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
@@ -190,6 +270,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
               <tr>
+                {isSelectionMode && <th className="px-6 py-3 w-10 no-print">#</th>}
                 <th className="px-6 py-3">Item</th>
                 <th className="px-6 py-3">Local/Setor</th>
                 <th className="px-6 py-3">Aquisição</th>
@@ -201,9 +282,20 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-               {filteredAssets.length > 0 ? (
-                 filteredAssets.map(asset => (
-                   <tr key={asset.id} className="hover:bg-slate-50">
+               {displayedAssets.length > 0 ? (
+                 displayedAssets.map(asset => (
+                   <tr key={asset.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(asset.id) ? 'bg-emerald-50' : ''}`}>
+                     {isSelectionMode && (
+                        <td className="px-6 py-3 no-print">
+                            <button onClick={() => toggleSelection(asset.id)}>
+                                {selectedIds.has(asset.id) ? (
+                                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                ) : (
+                                    <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                                )}
+                            </button>
+                        </td>
+                      )}
                      <td className="px-6 py-3">
                         <div className="flex items-center gap-3">
                            {asset.photoUrl ? (
@@ -263,7 +355,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                  ))
                ) : (
                  <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={isSelectionMode ? 9 : 8} className="px-6 py-12 text-center text-slate-400">
                         Nenhum bem cadastrado.
                     </td>
                  </tr>
@@ -272,7 +364,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
           </table>
         </div>
       </div>
-
+      {/* Modals unchanged */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
             <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">

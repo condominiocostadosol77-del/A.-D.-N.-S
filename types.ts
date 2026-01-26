@@ -130,6 +130,7 @@ export interface WorkProject {
   totalCost: number;
   sector: string;
   responsible?: string;
-  receiptUrl?: string; // Campo novo para imagem do recibo
+  receiptUrl?: string; // Mantido para legado
+  receiptUrls?: string[]; // Novo campo para múltiplos anexos
   createdAt: string;
 }
