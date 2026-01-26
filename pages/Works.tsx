@@ -287,7 +287,8 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      {/* Alteração 1: Mudar de grid para block na impressão para evitar quebra de layout */}
+      <div className="grid grid-cols-1 gap-6 print:block">
         {displayedWorks.length > 0 ? (
            displayedWorks.map(work => {
              // Compatibilidade com legado: cria array se não existir
@@ -298,7 +299,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
              return (
              <div 
                 key={work.id} 
-                className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
+                className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid print:mb-6 ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
                 style={{ pageBreakInside: 'avoid' }}
              >
                 
@@ -334,21 +335,20 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        {work.description}
                    </div>
 
-                   {/* Grid de Imagens para Impressão e Tela */}
+                   {/* Alteração 2: Grid de imagens otimizado para impressão (lado a lado e menor altura) */}
                    {images.length > 0 && (
                      <div className="mt-4 pt-2 border-t border-dashed border-slate-300">
                         <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2">
                             <ImageIcon className="w-4 h-4" /> Anexos e Comprovantes ({images.length}):
                         </p>
                         
-                        {/* Print: Stack images vertically or grid to fit paper */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:grid print:grid-cols-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:grid print:grid-cols-2 print:gap-2">
                             {images.map((img, idx) => (
                                 <div key={idx} className="print:break-inside-avoid">
                                     <img 
                                         src={img} 
                                         alt={`Anexo ${idx + 1}`} 
-                                        className="w-full h-auto max-h-[400px] print:max-h-[250px] object-contain border border-slate-200 bg-white rounded" 
+                                        className="w-full h-auto max-h-[400px] print:max-h-[200px] object-contain border border-slate-200 bg-white rounded" 
                                     />
                                 </div>
                             ))}
