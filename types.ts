@@ -27,6 +27,7 @@ export interface Member {
   email: string;
   address: string;
   baptismDate?: string;
+  isBaptized?: boolean; // Novo campo
   role: Role;
   isTither: boolean;
   sector: string; 

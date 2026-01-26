@@ -184,7 +184,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     .filter(w => currentSector === 'ALL' || w.sector === currentSector)
     .filter(w => w.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Correção 1: displayedWorks agora contém TODOS os itens filtrados, não removemos itens da tela.
+  // displayedWorks agora contém TODOS os itens filtrados.
   // O filtro visual para impressão será feito via CSS (print:hidden).
   const displayedWorks = filteredWorks;
 
@@ -199,14 +199,14 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0 print:block">
       <div className="print-header hidden">
         <h1 className="text-xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p className="text-sm">Relatório de Obras e Reformas - {getSectorName(currentSector)}</p>
         <p className="text-xs text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Hammer className="w-6 h-6 text-amber-600" />
@@ -261,7 +261,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex gap-4 items-center">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex gap-4 items-center print:hidden">
         {isSelectionMode && (
             <button 
                 onClick={toggleAll}
@@ -287,18 +287,21 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Alteração: print:block para evitar bugs de grid na impressão */}
-      <div className="grid grid-cols-1 gap-6 print:block">
+      {/* Grid de Obras */}
+      <div className="grid grid-cols-1 gap-6 print:block print:gap-0 print:mt-0">
         {displayedWorks.length > 0 ? (
-           displayedWorks.map(work => {
+           displayedWorks.map((work, index) => {
              // Compatibilidade com legado: cria array se não existir
              const images = work.receiptUrls && work.receiptUrls.length > 0 
                 ? work.receiptUrls 
                 : (work.receiptUrl ? [work.receiptUrl] : []);
              
-             // Correção 2: Verifica se deve ser impresso. Se não, aplica 'print:hidden'.
+             // Verifica se deve ser impresso. Se não, aplica 'print:hidden'.
              const isSelected = selectedIds.has(work.id);
              const shouldPrint = !isSelectionMode || (isSelectionMode && selectedIds.size === 0) || isSelected;
+             
+             // Não quebra página após o último item
+             const isLastItem = index === displayedWorks.length - 1;
 
              return (
              <div 
@@ -307,15 +310,15 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                     bg-white rounded-xl shadow-sm border p-6 
                     print:p-0 print:border-0 print:shadow-none print:rounded-none 
                     flex flex-col md:flex-row 
-                    print:flex-col print:min-h-[90vh] print:justify-start
+                    print:flex-col print:min-h-[95vh] print:justify-start
                     gap-6 print:gap-6 
                     hover:shadow-md transition-shadow 
                     break-inside-avoid print:break-inside-avoid
                     ${!shouldPrint ? 'print:hidden' : ''}
                     ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}
                 `}
-                // Correção 3: pageBreakAfter: 'always' garante uma obra por página.
-                style={{ pageBreakInside: 'avoid', pageBreakAfter: 'always' }}
+                // Quebra de página "always" exceto no último item para evitar folha em branco no final
+                style={{ pageBreakInside: 'avoid', pageBreakAfter: isLastItem ? 'auto' : 'always' }}
              >
                 
                 {isSelectionMode && (
@@ -332,7 +335,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
                 <div className="flex-1 space-y-3 min-w-0 print:w-full">
                    <div className="flex items-start justify-between">
-                       <div className="print:w-full print:text-center print:border-b print:border-slate-800 print:pb-4 print:mb-4">
+                       <div className="print:w-full print:text-center print:border-b print:border-slate-800 print:pb-2 print:mb-4">
                            <h3 className="text-xl font-bold text-slate-800 break-words print:text-2xl">{work.title}</h3>
                            <div className="flex items-center gap-2 mt-1 print:justify-center">
                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide no-print ${getStatusColor(work.status)}`}>
@@ -353,7 +356,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        {work.description}
                    </div>
 
-                   {/* Correção 4: Imagens maiores na impressão já que temos a página toda */}
                    {images.length > 0 && (
                      <div className="mt-4 pt-2 border-t border-dashed border-slate-300 print:border-t-2 print:border-slate-200">
                         <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2 print:text-sm print:mt-4">

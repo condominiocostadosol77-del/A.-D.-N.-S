@@ -49,7 +49,8 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   // Form State
   const [formData, setFormData] = useState<Partial<Member>>({
     role: Role.MEMBER,
-    isTither: false,
+    isBaptized: false, // Alterado de isTither para isBaptized
+    isTither: false, // Mantém false por padrão para compatibilidade
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector
   });
 
@@ -136,7 +137,8 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
       address: formData.address || '',
       baptismDate: formData.baptismDate,
       role: formData.role || Role.MEMBER,
-      isTither: formData.isTither || false,
+      isTither: formData.isTither || false, // Legado, mantemos o valor se existir
+      isBaptized: formData.isBaptized || false, // Novo campo
       sector: formData.sector || 'SEDE', 
       photoUrl: formData.photoUrl,
       createdAt: editingMember ? editingMember.createdAt : new Date().toISOString()
@@ -148,6 +150,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
         setEditingMember(null);
         setFormData({ 
           role: Role.MEMBER, 
+          isBaptized: false,
           isTither: false,
           sector: currentSector === 'ALL' ? 'SEDE' : currentSector
         });
@@ -192,14 +195,10 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
         const term = searchTerm.toLowerCase();
         if (!term) return true;
         
-        // Include "dizimista" string in search check if member is a tither
-        const titherString = m.isTither ? 'dizimista' : '';
-        
         return (
             m.fullName.toLowerCase().includes(term) ||
             m.role.toLowerCase().includes(term) ||
-            m.email.toLowerCase().includes(term) ||
-            titherString.includes(term)
+            m.email.toLowerCase().includes(term)
         );
     });
 
@@ -258,7 +257,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                     setEditingMember(null);
                     setFormData({ 
                     role: Role.MEMBER, 
-                    isTither: false,
+                    isBaptized: false,
                     sector: currentSector === 'ALL' ? 'SEDE' : currentSector
                     });
                     setIsModalOpen(true);
@@ -291,7 +290,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
-            placeholder="Buscar por nome, cargo ou 'dizimista'..." 
+            placeholder="Buscar por nome ou cargo..." 
             className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -346,9 +345,9 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
             
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center no-print">
               <div className="flex gap-2">
-                 {member.isTither && (
-                   <span className="text-xs text-amber-600 font-medium flex items-center gap-1" title="Dizimista">
-                     <Check className="w-3 h-3" /> Dizimista
+                 {member.isBaptized && (
+                   <span className="text-xs text-blue-600 font-medium flex items-center gap-1" title="Batizado">
+                     <Droplets className="w-3 h-3" /> Batizado
                    </span>
                  )}
               </div>
@@ -376,9 +375,9 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                 </button>
               </div>
             </div>
-            {/* Show tither status for print only */}
+            {/* Show baptized status for print only */}
             <div className="hidden print:block px-6 pb-2 text-xs text-gray-500">
-                 {member.isTither ? 'Dizimista' : 'Não Dizimista'} | Batismo: {member.baptismDate ? formatDate(member.baptismDate) : '-'}
+                 {member.isBaptized ? 'Batizado' : 'Não Batizado'} | Batismo: {member.baptismDate ? formatDate(member.baptismDate) : '-'}
             </div>
           </div>
         ))}
@@ -481,9 +480,9 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                           <p className="text-sm font-medium text-slate-800">{formatDate(viewingMember.baptismDate)}</p>
                        </div>
                        <div>
-                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Check className="w-3 h-3" /> Dizimista</p>
-                          <p className={`text-sm font-medium ${viewingMember.isTither ? 'text-emerald-600' : 'text-slate-500'}`}>
-                             {viewingMember.isTither ? 'Sim' : 'Não'}
+                          <p className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Check className="w-3 h-3" /> Batizado</p>
+                          <p className={`text-sm font-medium ${viewingMember.isBaptized ? 'text-blue-600' : 'text-slate-500'}`}>
+                             {viewingMember.isBaptized ? 'Sim' : 'Não'}
                           </p>
                        </div>
                     </div>
@@ -596,10 +595,12 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                   <input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-emerald-500" 
                     value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                 </div>
+                
+                {/* Alterado: Checkbox Dizimista removido, adicionado Checkbox Batizado */}
                 <div className="col-span-full flex items-center gap-2">
-                  <input type="checkbox" id="tither" className="w-4 h-4 text-emerald-600 rounded"
-                    checked={formData.isTither || false} onChange={e => setFormData({...formData, isTither: e.target.checked})} />
-                  <label htmlFor="tither" className="text-sm font-medium text-slate-700">Membro é dizimista ativo?</label>
+                  <input type="checkbox" id="baptized" className="w-4 h-4 text-emerald-600 rounded"
+                    checked={formData.isBaptized || false} onChange={e => setFormData({...formData, isBaptized: e.target.checked})} />
+                  <label htmlFor="baptized" className="text-sm font-medium text-slate-700">Membro é batizado?</label>
                 </div>
               </div>
 

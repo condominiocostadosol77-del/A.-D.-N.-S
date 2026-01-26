@@ -16,13 +16,17 @@ let isFirebaseInitialized = false;
 
 try {
     const app = initializeApp(firebaseConfig);
-    // Inicialização simples e robusta do Firestore
+    // Inicialização do Firestore
     db = getFirestore(app);
     isFirebaseInitialized = true;
-    console.log("Firebase inicializado com sucesso.");
-} catch (error) {
-  console.error("ERRO CRÍTICO: Falha ao conectar no Firebase:", error);
-  // O app continuará funcionando via LocalStorage se o Firebase falhar
+    console.log("Firebase conectado.");
+} catch (error: any) {
+  // Se o Firebase falhar (config inválida ou erro de importação),
+  // o app continuará funcionando via LocalStorage (modo offline/fallback).
+  console.warn("Aviso: Firebase não pôde ser inicializado. Usando armazenamento local (Offline Mode).");
+  console.warn("Detalhes do erro:", error.message || error);
+  isFirebaseInitialized = false;
+  db = null;
 }
 
 export { db, isFirebaseInitialized };
