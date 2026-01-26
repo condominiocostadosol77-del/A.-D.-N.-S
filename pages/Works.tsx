@@ -201,9 +201,9 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   return (
     <div className="space-y-6">
       <div className="print-header hidden">
-        <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
-        <p>Relatório de Obras e Reformas - {getSectorName(currentSector)}</p>
-        <p className="text-sm text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
+        <h1 className="text-xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
+        <p className="text-sm">Relatório de Obras e Reformas - {getSectorName(currentSector)}</p>
+        <p className="text-xs text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -287,7 +287,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
         </div>
       </div>
 
-      {/* Alteração 1: Mudar de grid para block na impressão para evitar quebra de layout */}
+      {/* Alteração: print:block para evitar bugs de grid na impressão */}
       <div className="grid grid-cols-1 gap-6 print:block">
         {displayedWorks.length > 0 ? (
            displayedWorks.map(work => {
@@ -299,7 +299,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
              return (
              <div 
                 key={work.id} 
-                className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid print:mb-6 ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
+                className={`bg-white rounded-xl shadow-sm border p-6 print:p-0 print:border-b print:border-slate-300 print:shadow-none print:rounded-none flex flex-col md:flex-row print:flex-row gap-6 print:gap-4 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid print:mb-4 ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
                 style={{ pageBreakInside: 'avoid' }}
              >
                 
@@ -320,7 +320,10 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        <div>
                            <h3 className="text-xl font-bold text-slate-800 break-words">{work.title}</h3>
                            <div className="flex items-center gap-2 mt-1">
-                               <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(work.status)}`}>
+                               <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide no-print ${getStatusColor(work.status)}`}>
+                                   {work.status}
+                               </span>
+                               <span className="text-xs font-bold uppercase border border-slate-300 px-1 rounded print:inline-block hidden">
                                    {work.status}
                                </span>
                                <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -330,25 +333,25 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                        </div>
                    </div>
                    
-                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap break-words max-w-full">
-                       <strong className="block text-xs text-slate-400 uppercase mb-1">Descrição / Detalhes (Ata)</strong>
+                   <div className="bg-slate-50 p-4 print:p-2 print:bg-transparent print:border-0 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap break-words max-w-full">
+                       <strong className="block text-xs text-slate-400 uppercase mb-1">Descrição / Detalhes</strong>
                        {work.description}
                    </div>
 
-                   {/* Alteração 2: Grid de imagens otimizado para impressão (lado a lado e menor altura) */}
+                   {/* Alteração: Layout Flex com wrap para imagens lado a lado */}
                    {images.length > 0 && (
                      <div className="mt-4 pt-2 border-t border-dashed border-slate-300">
                         <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2">
-                            <ImageIcon className="w-4 h-4" /> Anexos e Comprovantes ({images.length}):
+                            <ImageIcon className="w-4 h-4" /> Anexos ({images.length})
                         </p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:grid print:grid-cols-2 print:gap-2">
+                        <div className="flex flex-wrap gap-2 print:gap-2">
                             {images.map((img, idx) => (
-                                <div key={idx} className="print:break-inside-avoid">
+                                <div key={idx} className="relative w-full sm:w-[48%] print:w-[45%] h-48 print:h-32 border border-slate-200 rounded bg-white print:break-inside-avoid">
                                     <img 
                                         src={img} 
                                         alt={`Anexo ${idx + 1}`} 
-                                        className="w-full h-auto max-h-[400px] print:max-h-[200px] object-contain border border-slate-200 bg-white rounded" 
+                                        className="w-full h-full object-contain" 
                                     />
                                 </div>
                             ))}
@@ -357,9 +360,9 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    )}
                 </div>
 
-                <div className="md:w-64 flex flex-col gap-4 border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                <div className="md:w-64 print:w-48 flex flex-col gap-4 border-t md:border-t-0 md:border-l print:border-t-0 print:border-l border-slate-100 md:pl-6 print:pl-4 pt-4 md:pt-0 print:pt-0">
                     <div>
-                        <p className="text-xs text-slate-500 mb-1">Custo Total (Gasto)</p>
+                        <p className="text-xs text-slate-500 mb-1">Custo Total</p>
                         <p className="text-2xl font-bold text-slate-800">R$ {work.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
 
@@ -370,11 +373,11 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                         </div>
                         <div className="flex items-center gap-2 text-slate-600">
                              <Clock className="w-4 h-4 text-amber-500" />
-                             <span>Fim: {work.endDate ? new Date(work.endDate).toLocaleDateString('pt-BR') : 'Em andamento'}</span>
+                             <span>Fim: {work.endDate ? new Date(work.endDate).toLocaleDateString('pt-BR') : '...'}</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-600">
                              <FileText className="w-4 h-4 text-amber-500" />
-                             <span>Resp: {work.responsible || 'Não informado'}</span>
+                             <span className="truncate">Resp: {work.responsible || '-'}</span>
                         </div>
                     </div>
 
