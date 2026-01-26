@@ -184,20 +184,6 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     .filter(w => currentSector === 'ALL' || w.sector === currentSector)
     .filter(w => w.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Se estiver em modo de seleção e for imprimir (css print media), 
-  // idealmente o React mostraria apenas os selecionados.
-  // Como o CSS print esconde coisas, vamos filtrar a lista visualmente se estivermos imprimindo "selecionados".
-  // Mas a ação de imprimir é externa. 
-  // Estratégia: A lista renderizada obedece a seleção SE o modo de seleção estiver ativo E o usuário clicar em imprimir?
-  // Simplificação: Se o modo de seleção estiver ativo, filtramos a lista renderizada APENAS se houver itens selecionados E estivermos imprimindo?
-  // Não, vamos filtrar a lista renderizada para mostrar apenas os selecionados visualmente quando for imprimir?
-  // O melhor fluxo: 
-  // 1. Seleciona itens.
-  // 2. Clica "Imprimir Selecionados".
-  // 3. O navegador imprime o que está na tela.
-  // 4. Portanto, a tela deve mostrar APENAS o que está selecionado quando for imprimir.
-  
-  // Vamos criar uma lista final para renderizar
   const displayedWorks = isSelectionMode && selectedIds.size > 0 
       ? filteredWorks.filter(w => selectedIds.has(w.id))
       : filteredWorks;
@@ -310,7 +296,11 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                 : (work.receiptUrl ? [work.receiptUrl] : []);
 
              return (
-             <div key={work.id} className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}>
+             <div 
+                key={work.id} 
+                className={`bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
+                style={{ pageBreakInside: 'avoid' }}
+             >
                 
                 {isSelectionMode && (
                     <div className="no-print flex items-start pt-1">
@@ -352,13 +342,13 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                         </p>
                         
                         {/* Print: Stack images vertically or grid to fit paper */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:block">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:grid print:grid-cols-2">
                             {images.map((img, idx) => (
-                                <div key={idx} className="print:mb-4 print:break-inside-avoid">
+                                <div key={idx} className="print:break-inside-avoid">
                                     <img 
                                         src={img} 
                                         alt={`Anexo ${idx + 1}`} 
-                                        className="w-full h-auto max-h-[400px] object-contain border border-slate-200 bg-white rounded" 
+                                        className="w-full h-auto max-h-[400px] print:max-h-[250px] object-contain border border-slate-200 bg-white rounded" 
                                     />
                                 </div>
                             ))}
