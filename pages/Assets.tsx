@@ -161,9 +161,8 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                  a.description?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const displayedAssets = isSelectionMode && selectedIds.size > 0
-    ? filteredAssets.filter(a => selectedIds.has(a.id))
-    : filteredAssets;
+  // Mantém todos na tela, filtra apenas via CSS na impressão
+  const displayedAssets = filteredAssets;
 
   const totalValue = filteredAssets.reduce((acc, curr) => acc + (curr.value * curr.quantity), 0);
 
@@ -284,7 +283,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
             <tbody className="divide-y divide-slate-100">
                {displayedAssets.length > 0 ? (
                  displayedAssets.map(asset => (
-                   <tr key={asset.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(asset.id) ? 'bg-emerald-50' : ''}`}>
+                   <tr key={asset.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(asset.id) ? 'bg-emerald-50' : ''} ${isSelectionMode && !selectedIds.has(asset.id) ? 'print:hidden' : ''}`}>
                      {isSelectionMode && (
                         <td className="px-6 py-3 no-print">
                             <button onClick={() => toggleSelection(asset.id)}>

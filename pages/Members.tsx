@@ -203,18 +203,8 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
         );
     });
 
-  // Only show selected members if in selection mode and selections exist (logic for what to render)
-  // BUT: We want to see all to select them. We only want to filter during print? 
-  // No, easier UX: user selects, clicks print, browser prints what is on screen.
-  // So we filter the LIST based on selection ONLY if printing? 
-  // Browser print prints the DOM. So we must hide unselected items or filter them out before print call.
-  // Let's filter the rendered list if selection mode is ON and we have items selected?
-  // Actually, standard behavior: Show checkboxes. If user clicks "Print Selected", trigger print.
-  // To make print work with selection, we filter the `displayedMembers` based on selection state.
-  
-  const displayedMembers = isSelectionMode && selectedIds.size > 0 
-      ? filteredMembers.filter(m => selectedIds.has(m.id))
-      : filteredMembers;
+  // Mantém todos na tela, filtra apenas via CSS na impressão
+  const displayedMembers = filteredMembers;
 
   return (
     <div className="space-y-6">
@@ -312,7 +302,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
       {/* Members List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedMembers.map((member) => (
-          <div key={member.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow break-inside-avoid ${isSelectionMode && selectedIds.has(member.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}>
+          <div key={member.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow break-inside-avoid ${isSelectionMode && selectedIds.has(member.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'} ${isSelectionMode && !selectedIds.has(member.id) ? 'print:hidden' : ''}`}>
             <div className="p-6 flex items-start gap-4 cursor-pointer" onClick={() => !isSelectionMode && setViewingMember(member)}>
               
               {isSelectionMode && (

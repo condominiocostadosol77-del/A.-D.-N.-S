@@ -187,9 +187,8 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
       );
     });
 
-  const displayedDisciplines = isSelectionMode && selectedIds.size > 0
-    ? filteredDisciplines.filter(d => selectedIds.has(d.id))
-    : filteredDisciplines;
+  // Mantém todos na tela, filtra apenas via CSS na impressão
+  const displayedDisciplines = filteredDisciplines;
 
   // Filter members for the modal dropdown
   const availableMembers = members.filter(m => currentSector === 'ALL' || m.sector === currentSector);
@@ -323,7 +322,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
                   const isActive = isDisciplineActive(d.endDate);
                   
                   return (
-                    <tr key={d.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(d.id) ? 'bg-emerald-50' : ''}`}>
+                    <tr key={d.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(d.id) ? 'bg-emerald-50' : ''} ${isSelectionMode && !selectedIds.has(d.id) ? 'print:hidden' : ''}`}>
                       {isSelectionMode && (
                         <td className="px-6 py-3 no-print">
                             <button onClick={() => toggleSelection(d.id)}>
