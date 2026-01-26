@@ -184,9 +184,9 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     .filter(w => currentSector === 'ALL' || w.sector === currentSector)
     .filter(w => w.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const displayedWorks = isSelectionMode && selectedIds.size > 0 
-      ? filteredWorks.filter(w => selectedIds.has(w.id))
-      : filteredWorks;
+  // Correção 1: displayedWorks agora contém TODOS os itens filtrados, não removemos itens da tela.
+  // O filtro visual para impressão será feito via CSS (print:hidden).
+  const displayedWorks = filteredWorks;
 
   const getStatusColor = (status: WorkStatus) => {
     switch (status) {
@@ -295,12 +295,27 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
              const images = work.receiptUrls && work.receiptUrls.length > 0 
                 ? work.receiptUrls 
                 : (work.receiptUrl ? [work.receiptUrl] : []);
+             
+             // Correção 2: Verifica se deve ser impresso. Se não, aplica 'print:hidden'.
+             const isSelected = selectedIds.has(work.id);
+             const shouldPrint = !isSelectionMode || (isSelectionMode && selectedIds.size === 0) || isSelected;
 
              return (
              <div 
                 key={work.id} 
-                className={`bg-white rounded-xl shadow-sm border p-6 print:p-0 print:border-b print:border-slate-300 print:shadow-none print:rounded-none flex flex-col md:flex-row print:flex-row gap-6 print:gap-4 hover:shadow-md transition-shadow break-inside-avoid print:break-inside-avoid print:mb-4 ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}`}
-                style={{ pageBreakInside: 'avoid' }}
+                className={`
+                    bg-white rounded-xl shadow-sm border p-6 
+                    print:p-0 print:border-0 print:shadow-none print:rounded-none 
+                    flex flex-col md:flex-row 
+                    print:flex-col print:min-h-[90vh] print:justify-start
+                    gap-6 print:gap-6 
+                    hover:shadow-md transition-shadow 
+                    break-inside-avoid print:break-inside-avoid
+                    ${!shouldPrint ? 'print:hidden' : ''}
+                    ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}
+                `}
+                // Correção 3: pageBreakAfter: 'always' garante uma obra por página.
+                style={{ pageBreakInside: 'avoid', pageBreakAfter: 'always' }}
              >
                 
                 {isSelectionMode && (
@@ -315,43 +330,43 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                     </div>
                 )}
 
-                <div className="flex-1 space-y-3 min-w-0">
+                <div className="flex-1 space-y-3 min-w-0 print:w-full">
                    <div className="flex items-start justify-between">
-                       <div>
-                           <h3 className="text-xl font-bold text-slate-800 break-words">{work.title}</h3>
-                           <div className="flex items-center gap-2 mt-1">
+                       <div className="print:w-full print:text-center print:border-b print:border-slate-800 print:pb-4 print:mb-4">
+                           <h3 className="text-xl font-bold text-slate-800 break-words print:text-2xl">{work.title}</h3>
+                           <div className="flex items-center gap-2 mt-1 print:justify-center">
                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide no-print ${getStatusColor(work.status)}`}>
                                    {work.status}
                                </span>
-                               <span className="text-xs font-bold uppercase border border-slate-300 px-1 rounded print:inline-block hidden">
-                                   {work.status}
+                               <span className="text-sm font-bold uppercase border border-slate-800 px-2 py-1 rounded print:inline-block hidden">
+                                   STATUS: {work.status}
                                </span>
-                               <span className="text-xs text-slate-400 flex items-center gap-1">
-                                   <MapPin className="w-3 h-3" /> {getSectorName(work.sector)}
+                               <span className="text-xs text-slate-400 flex items-center gap-1 print:text-slate-600 print:text-sm print:ml-4">
+                                   <MapPin className="w-3 h-3 print:w-4 print:h-4" /> {getSectorName(work.sector)}
                                </span>
                            </div>
                        </div>
                    </div>
                    
-                   <div className="bg-slate-50 p-4 print:p-2 print:bg-transparent print:border-0 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap break-words max-w-full">
-                       <strong className="block text-xs text-slate-400 uppercase mb-1">Descrição / Detalhes</strong>
+                   <div className="bg-slate-50 p-4 print:p-0 print:bg-transparent rounded-lg border border-slate-200 print:border-0 text-sm text-slate-700 whitespace-pre-wrap break-words max-w-full print:text-base print:mb-6">
+                       <strong className="block text-xs text-slate-400 uppercase mb-1 print:text-slate-600 print:font-bold print:mb-2">Descrição / Detalhes</strong>
                        {work.description}
                    </div>
 
-                   {/* Alteração: Layout Flex com wrap para imagens lado a lado */}
+                   {/* Correção 4: Imagens maiores na impressão já que temos a página toda */}
                    {images.length > 0 && (
-                     <div className="mt-4 pt-2 border-t border-dashed border-slate-300">
-                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2">
+                     <div className="mt-4 pt-2 border-t border-dashed border-slate-300 print:border-t-2 print:border-slate-200">
+                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-2 print:text-sm print:mt-4">
                             <ImageIcon className="w-4 h-4" /> Anexos ({images.length})
                         </p>
                         
-                        <div className="flex flex-wrap gap-2 print:gap-2">
+                        <div className="flex flex-wrap gap-2 print:gap-4 print:justify-center">
                             {images.map((img, idx) => (
-                                <div key={idx} className="relative w-full sm:w-[48%] print:w-[45%] h-48 print:h-32 border border-slate-200 rounded bg-white print:break-inside-avoid">
+                                <div key={idx} className="relative w-full sm:w-[48%] print:w-[48%] h-48 print:h-64 border border-slate-200 rounded bg-white print:break-inside-avoid print:shadow-sm">
                                     <img 
                                         src={img} 
                                         alt={`Anexo ${idx + 1}`} 
-                                        className="w-full h-full object-contain" 
+                                        className="w-full h-full object-contain p-1" 
                                     />
                                 </div>
                             ))}
@@ -360,13 +375,31 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    )}
                 </div>
 
-                <div className="md:w-64 print:w-48 flex flex-col gap-4 border-t md:border-t-0 md:border-l print:border-t-0 print:border-l border-slate-100 md:pl-6 print:pl-4 pt-4 md:pt-0 print:pt-0">
-                    <div>
-                        <p className="text-xs text-slate-500 mb-1">Custo Total</p>
-                        <p className="text-2xl font-bold text-slate-800">R$ {work.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <div className="md:w-64 print:w-full print:mt-auto flex flex-col gap-4 border-t md:border-t-0 md:border-l print:border-t print:border-l-0 border-slate-100 md:pl-6 print:pl-0 pt-4 md:pt-0 print:pt-6">
+                    <div className="print:flex print:justify-between print:items-center print:bg-slate-50 print:p-4 print:rounded-lg print:border print:border-slate-200">
+                        <div>
+                             <p className="text-xs text-slate-500 mb-1 print:text-sm">Custo Total</p>
+                             <p className="text-2xl font-bold text-slate-800 print:text-3xl">R$ {work.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        
+                        {/* Exibir datas em destaque na impressão horizontalmente */}
+                        <div className="hidden print:flex gap-6 text-sm">
+                             <div className="flex items-center gap-2 text-slate-600">
+                                  <Calendar className="w-4 h-4 text-slate-800" />
+                                  <span>Início: <strong>{new Date(work.startDate).toLocaleDateString('pt-BR')}</strong></span>
+                             </div>
+                             <div className="flex items-center gap-2 text-slate-600">
+                                  <Clock className="w-4 h-4 text-slate-800" />
+                                  <span>Fim: <strong>{work.endDate ? new Date(work.endDate).toLocaleDateString('pt-BR') : '...'}</strong></span>
+                             </div>
+                             <div className="flex items-center gap-2 text-slate-600">
+                                  <FileText className="w-4 h-4 text-slate-800" />
+                                  <span>Resp: <strong>{work.responsible || '-'}</strong></span>
+                             </div>
+                        </div>
                     </div>
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-sm print:hidden">
                         <div className="flex items-center gap-2 text-slate-600">
                              <Calendar className="w-4 h-4 text-amber-500" />
                              <span>Início: {new Date(work.startDate).toLocaleDateString('pt-BR')}</span>
