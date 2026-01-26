@@ -200,11 +200,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
   return (
     <div className="space-y-6 print:space-y-0 print:block">
-      <div className="print-header hidden">
-        <h1 className="text-xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
-        <p className="text-sm">Relatório de Obras e Reformas - {getSectorName(currentSector)}</p>
-        <p className="text-xs text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
-      </div>
+      {/* Cabeçalho de impressão global removido para evitar conflitos de página */}
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
@@ -310,16 +306,21 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                     bg-white rounded-xl shadow-sm border p-6 
                     print:p-0 print:border-0 print:shadow-none print:rounded-none 
                     flex flex-col md:flex-row 
-                    print:flex-col print:min-h-[95vh] print:justify-start
-                    gap-6 print:gap-6 
+                    print:flex-col 
+                    gap-6 print:gap-4 
                     hover:shadow-md transition-shadow 
-                    break-inside-avoid print:break-inside-avoid
                     ${!shouldPrint ? 'print:hidden' : ''}
                     ${isSelectionMode && selectedIds.has(work.id) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100'}
                 `}
-                // Quebra de página "always" exceto no último item para evitar folha em branco no final
-                style={{ pageBreakInside: 'avoid', pageBreakAfter: isLastItem ? 'auto' : 'always' }}
+                // Garante que cada item comece em uma nova página, exceto o último. Removemos break-inside-avoid para evitar páginas em branco se o conteúdo for grande.
+                style={{ pageBreakAfter: isLastItem ? 'auto' : 'always' }}
              >
+                {/* Header Individual por Página */}
+                <div className="hidden print:block text-center border-b-2 border-slate-800 pb-2 mb-4">
+                    <h1 className="text-xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
+                    <p className="text-sm">Relatório de Obras e Reformas - {getSectorName(work.sector)}</p>
+                    <p className="text-xs text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
                 
                 {isSelectionMode && (
                     <div className="no-print flex items-start pt-1">
@@ -364,7 +365,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                         
                         <div className="flex flex-wrap gap-2 print:gap-4 print:justify-center">
                             {images.map((img, idx) => (
-                                <div key={idx} className="relative w-full sm:w-[48%] print:w-[48%] h-48 print:h-64 border border-slate-200 rounded bg-white print:break-inside-avoid print:shadow-sm">
+                                <div key={idx} className="relative w-full sm:w-[48%] print:w-[48%] h-48 print:h-64 border border-slate-200 rounded bg-white print:shadow-sm">
                                     <img 
                                         src={img} 
                                         alt={`Anexo ${idx + 1}`} 
@@ -377,7 +378,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    )}
                 </div>
 
-                <div className="md:w-64 print:w-full print:mt-auto flex flex-col gap-4 border-t md:border-t-0 md:border-l print:border-t print:border-l-0 border-slate-100 md:pl-6 print:pl-0 pt-4 md:pt-0 print:pt-6">
+                <div className="md:w-64 print:w-full print:mt-8 flex flex-col gap-4 border-t md:border-t-0 md:border-l print:border-t print:border-l-0 border-slate-100 md:pl-6 print:pl-0 pt-4 md:pt-0 print:pt-6">
                     <div className="print:flex print:justify-between print:items-center print:bg-slate-50 print:p-4 print:rounded-lg print:border print:border-slate-200">
                         <div>
                              <p className="text-xs text-slate-500 mb-1 print:text-sm">Custo Total</p>
