@@ -13,7 +13,9 @@ import {
   Loader2,
   Edit2,
   CheckSquare,
-  Square
+  Square,
+  FileText,
+  ArrowLeft
 } from 'lucide-react';
 import { Asset, Sector, AssetCondition } from '../types';
 import * as storage from '../services/storage';
@@ -35,6 +37,9 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   // Selection Mode
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Minute Mode (Termo de Conferência)
+  const [isMinuteMode, setIsMinuteMode] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Asset>>({
     quantity: 1,
@@ -80,8 +85,8 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.value) {
-      alert('Preencha nome e valor.');
+    if (!formData.name || (formData.value === undefined || formData.value === null)) {
+      alert('Preencha o nome do bem.');
       return;
     }
 
@@ -92,7 +97,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
       name: formData.name!,
       description: formData.description || '',
       acquisitionDate: formData.acquisitionDate || new Date().toISOString(),
-      value: Number(formData.value),
+      value: Number(formData.value) || 0,
       quantity: Number(formData.quantity) || 1,
       condition: formData.condition || AssetCondition.GOOD,
       location: formData.location || '',
@@ -150,7 +155,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
 
   const handlePrint = () => {
     if (isSelectionMode && selectedIds.size === 0) {
-        alert("Selecione pelo menos um item para imprimir.");
+        alert("Selecione pelo menos um registro para imprimir.");
         return;
     }
     window.print();
@@ -161,68 +166,91 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                  a.description?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Mantém todos na tela, filtra apenas via CSS na impressão
   const displayedAssets = filteredAssets;
+  const itemsForMinute = isSelectionMode && selectedIds.size > 0 
+      ? displayedAssets.filter(a => selectedIds.has(a.id))
+      : displayedAssets;
 
-  const totalValue = filteredAssets.reduce((acc, curr) => acc + (curr.value * curr.quantity), 0);
+  const getLongDate = () => {
+    return new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
   return (
     <div className="space-y-6">
+      
+      {/* Print Header for Reports */}
       <div className="print-header hidden">
         <h1 className="text-2xl font-bold uppercase">A. D. NATIVIDADE DA SERRA</h1>
         <p>Relatório de Patrimônio - {getSectorName(currentSector)}</p>
         <p className="text-sm text-gray-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Package className="w-6 h-6 text-blue-600" />
             Bens e Patrimônio
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-             Inventário de bens da igreja. Valor Total Estimado: <strong className="text-emerald-600">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+             Inventário de bens da igreja.
           </p>
         </div>
-        <div className="flex gap-2 no-print">
-            {isSelectionMode ? (
+        <div className="flex gap-2">
+            {isMinuteMode ? (
+                <button 
+                    onClick={() => setIsMinuteMode(false)}
+                    className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors flex items-center gap-2"
+                >
+                    <ArrowLeft className="w-4 h-4" /> Voltar
+                </button>
+            ) : (
                 <>
+                {isSelectionMode ? (
+                    <>
+                        <button 
+                            onClick={() => {
+                                setIsSelectionMode(false);
+                                setSelectedIds(new Set());
+                            }}
+                            className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            onClick={handlePrint}
+                            className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-2"
+                        >
+                            <Printer className="w-4 h-4" /> Imprimir ({selectedIds.size})
+                        </button>
+                    </>
+                ) : (
                     <button 
-                        onClick={() => {
-                            setIsSelectionMode(false);
-                            setSelectedIds(new Set());
-                        }}
-                        className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
+                        onClick={() => setIsSelectionMode(true)}
+                        className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
                     >
-                        Cancelar
+                        <CheckSquare className="w-4 h-4" />
+                        Selecionar
                     </button>
+                )}
+
+                {!isSelectionMode && (
                     <button 
-                        onClick={handlePrint}
-                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors"
+                        onClick={() => window.print()} 
+                        className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                     >
                         <Printer className="w-4 h-4" />
-                        Imprimir Selecionados ({selectedIds.size})
+                        Imprimir Relatório
                     </button>
-                </>
-            ) : (
-                <button 
-                    onClick={() => setIsSelectionMode(true)}
-                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
-                >
-                    <CheckSquare className="w-4 h-4" />
-                    Selecionar para Imprimir
-                </button>
-            )}
+                )}
 
-            {!isSelectionMode && (
-                <>
                 <button 
-                    onClick={() => window.print()} 
-                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                    onClick={() => setIsMinuteMode(true)}
+                    className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors shadow-sm"
                 >
-                    <Printer className="w-4 h-4" />
-                    Imprimir Relatório
+                    <FileText className="w-4 h-4" />
+                    Gerar Termo de Conferência
                 </button>
+
                 <button 
                     onClick={() => {
                         closeModal();
@@ -235,134 +263,224 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                 </button>
                 </>
             )}
+
+            {isMinuteMode && (
+                <button 
+                    onClick={() => window.print()} 
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                    <Printer className="w-4 h-4" />
+                    Imprimir Termo
+                </button>
+            )}
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex items-center gap-3">
-        {isSelectionMode && (
-            <button 
-                onClick={toggleAll}
-                className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
-            >
-                {selectedIds.size === displayedAssets.length && displayedAssets.length > 0 ? (
-                    <CheckSquare className="w-5 h-5 text-emerald-600" />
-                ) : (
-                    <Square className="w-5 h-5 text-slate-400" />
-                )}
-                Todos
-            </button>
-        )}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input 
-            type="text" 
-            placeholder="Buscar item, descrição..." 
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
+      {/* MINUTE VIEW (TERMO DE CONFERÊNCIA) */}
+      {isMinuteMode ? (
+          <div className="bg-white shadow-lg mx-auto p-12 md:p-16 max-w-[210mm] min-h-[297mm] text-justify relative animate-fade-in print:shadow-none print:w-full print:m-0">
+             <div className="text-center mb-10">
+                <h1 className="text-xl font-bold font-serif uppercase tracking-widest text-slate-900 mb-2">
+                   A. D. NATIVIDADE DA SERRA
+                </h1>
+                <p className="text-sm font-medium text-slate-600 uppercase tracking-wide">
+                   Igreja Evangélica Assembleia de Deus – Ministério Taubaté – Setor Natividade da Serra
+                </p>
+                <p className="text-sm font-medium text-slate-600 uppercase tracking-wide">
+                   {currentSector === 'ALL' ? 'DIRETORIA DE PATRIMÔNIO' : getSectorName(currentSector)}
+                </p>
+                <div className="w-24 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
+                <h2 className="text-lg font-bold uppercase underline mt-6">
+                   TERMO DE INVENTÁRIO PATRIMONIAL
+                </h2>
+             </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
-              <tr>
-                {isSelectionMode && <th className="px-6 py-3 w-10 no-print">#</th>}
-                <th className="px-6 py-3">Item</th>
-                <th className="px-6 py-3">Local/Setor</th>
-                <th className="px-6 py-3">Aquisição</th>
-                <th className="px-6 py-3">Condição</th>
-                <th className="px-6 py-3">Qtd</th>
-                <th className="px-6 py-3">Valor Unit.</th>
-                <th className="px-6 py-3">Total</th>
-                <th className="px-6 py-3 text-right no-print">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-               {displayedAssets.length > 0 ? (
-                 displayedAssets.map(asset => (
-                   <tr key={asset.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(asset.id) ? 'bg-emerald-50' : ''} ${isSelectionMode && !selectedIds.has(asset.id) ? 'print:hidden' : ''}`}>
-                     {isSelectionMode && (
-                        <td className="px-6 py-3 no-print">
-                            <button onClick={() => toggleSelection(asset.id)}>
-                                {selectedIds.has(asset.id) ? (
-                                    <CheckSquare className="w-5 h-5 text-emerald-600" />
-                                ) : (
-                                    <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
-                                )}
-                            </button>
+             <div className="font-serif leading-loose text-slate-800 space-y-6">
+                <p>
+                    Aos <span className="font-bold">{getLongDate()}</span>, procedeu-se à conferência e inventário dos bens móveis e utensílios pertencentes à 
+                    Igreja Evangélica Assembleia de Deus – Ministério Taubaté – Setor Natividade da Serra{currentSector !== 'ALL' ? `, alocados na congregação ${getSectorName(currentSector)}` : ''}.
+                </p>
+                
+                <p>
+                    O presente termo tem por finalidade registrar a existência e o estado de conservação dos bens abaixo relacionados, 
+                    que ficam sob a guarda e responsabilidade da zeladoria local e da tesouraria desta instituição.
+                </p>
+
+                <div className="my-6">
+                    <table className="w-full border-collapse border border-slate-800 text-sm">
+                        <thead>
+                            <tr className="bg-slate-100">
+                                <th className="border border-slate-600 px-2 py-1 text-center">Qtd</th>
+                                <th className="border border-slate-600 px-2 py-1 text-left">Item / Descrição</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center">Condição</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center">Nº Tombo/ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {itemsForMinute.map(asset => (
+                                <tr key={asset.id}>
+                                    <td className="border border-slate-600 px-2 py-1 text-center">{asset.quantity}</td>
+                                    <td className="border border-slate-600 px-2 py-1">
+                                        <span className="font-bold uppercase">{asset.name}</span>
+                                        {asset.description && <span className="block text-xs italic">{asset.description}</span>}
+                                        {asset.location && <span className="block text-xs text-slate-500">Local: {asset.location}</span>}
+                                    </td>
+                                    <td className="border border-slate-600 px-2 py-1 text-center">{asset.condition}</td>
+                                    <td className="border border-slate-600 px-2 py-1 text-center text-xs font-mono">{asset.id.slice(0,6)}...</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>
+                    Declara-se que os itens foram verificados fisicamente e conferem com a descrição acima. 
+                    Quaisquer divergências ou danos futuros deverão ser comunicados imediatamente à diretoria.
+                </p>
+
+                <div className="mt-20 grid grid-cols-2 gap-16 text-center text-sm font-sans">
+                   <div>
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">1º Tesoureiro / Conferente</div>
+                   </div>
+                   <div>
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">Zelador / Responsável Local</div>
+                   </div>
+                </div>
+             </div>
+          </div>
+      ) : (
+      <>
+        {/* NORMAL VIEW (TABLE) */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100 no-print flex items-center gap-3">
+            {isSelectionMode && (
+                <button 
+                    onClick={toggleAll}
+                    className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+                >
+                    {selectedIds.size === displayedAssets.length && displayedAssets.length > 0 ? (
+                        <CheckSquare className="w-5 h-5 text-emerald-600" />
+                    ) : (
+                        <Square className="w-5 h-5 text-slate-400" />
+                    )}
+                    Todos
+                </button>
+            )}
+            <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <input 
+                type="text" 
+                placeholder="Buscar item, descrição..." 
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                <tr>
+                    {isSelectionMode && <th className="px-6 py-3 w-10 no-print">#</th>}
+                    <th className="px-6 py-3">Item</th>
+                    <th className="px-6 py-3">Local/Setor</th>
+                    <th className="px-6 py-3">Aquisição</th>
+                    <th className="px-6 py-3">Condição</th>
+                    <th className="px-6 py-3">Qtd</th>
+                    <th className="px-6 py-3">Valor Unit.</th>
+                    <th className="px-6 py-3">Total</th>
+                    <th className="px-6 py-3 text-right no-print">Ações</th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                {itemsForMinute.length > 0 ? (
+                    itemsForMinute.map(asset => (
+                    <tr key={asset.id} className={`hover:bg-slate-50 ${isSelectionMode && selectedIds.has(asset.id) ? 'bg-emerald-50' : ''}`}>
+                        {isSelectionMode && (
+                            <td className="px-6 py-3 no-print">
+                                <button onClick={() => toggleSelection(asset.id)}>
+                                    {selectedIds.has(asset.id) ? (
+                                        <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                    ) : (
+                                        <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                                    )}
+                                </button>
+                            </td>
+                        )}
+                        <td className="px-6 py-3">
+                            <div className="flex items-center gap-3">
+                            {asset.photoUrl ? (
+                                <img src={asset.photoUrl} alt="" className="w-10 h-10 rounded-lg object-cover bg-slate-100" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                    <Tag className="w-5 h-5 text-slate-400" />
+                                </div>
+                            )}
+                            <div>
+                                <p className="font-medium text-slate-800">{asset.name}</p>
+                                <p className="text-xs text-slate-400 truncate max-w-[150px]">{asset.description}</p>
+                            </div>
+                            </div>
                         </td>
-                      )}
-                     <td className="px-6 py-3">
-                        <div className="flex items-center gap-3">
-                           {asset.photoUrl ? (
-                               <img src={asset.photoUrl} alt="" className="w-10 h-10 rounded-lg object-cover bg-slate-100" />
-                           ) : (
-                               <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                                   <Tag className="w-5 h-5 text-slate-400" />
-                               </div>
-                           )}
-                           <div>
-                               <p className="font-medium text-slate-800">{asset.name}</p>
-                               <p className="text-xs text-slate-400 truncate max-w-[150px]">{asset.description}</p>
-                           </div>
-                        </div>
-                     </td>
-                     <td className="px-6 py-3">
-                        <div className="text-xs">
-                            <span className="font-medium text-slate-700">{getSectorName(asset.sector)}</span>
-                            {asset.location && <div className="text-slate-400">{asset.location}</div>}
-                        </div>
-                     </td>
-                     <td className="px-6 py-3">
-                         {new Date(asset.acquisitionDate).toLocaleDateString('pt-BR')}
-                     </td>
-                     <td className="px-6 py-3">
-                         <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                            ${asset.condition === AssetCondition.NEW ? 'bg-emerald-100 text-emerald-700' : 
-                              asset.condition === AssetCondition.GOOD ? 'bg-blue-100 text-blue-700' :
-                              asset.condition === AssetCondition.FAIR ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                            {asset.condition}
-                         </span>
-                     </td>
-                     <td className="px-6 py-3 font-medium">{asset.quantity}</td>
-                     <td className="px-6 py-3">R$ {asset.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                     <td className="px-6 py-3 font-bold text-slate-800">
-                         R$ {(asset.value * asset.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                     </td>
-                     <td className="px-6 py-3 text-right no-print">
-                        <div className="flex items-center justify-end gap-1">
-                            <button 
-                            onClick={() => handleEdit(asset)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full"
-                            title="Editar"
-                            >
-                                <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                            onClick={() => setDeleteId(asset.id)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
-                            title="Excluir"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                     </td>
-                   </tr>
-                 ))
-               ) : (
-                 <tr>
-                    <td colSpan={isSelectionMode ? 9 : 8} className="px-6 py-12 text-center text-slate-400">
-                        Nenhum bem cadastrado.
-                    </td>
-                 </tr>
-               )}
-            </tbody>
-          </table>
+                        <td className="px-6 py-3">
+                            <div className="text-xs">
+                                <span className="font-medium text-slate-700">{getSectorName(asset.sector)}</span>
+                                {asset.location && <div className="text-slate-400">{asset.location}</div>}
+                            </div>
+                        </td>
+                        <td className="px-6 py-3">
+                            {new Date(asset.acquisitionDate).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                                ${asset.condition === AssetCondition.NEW ? 'bg-emerald-100 text-emerald-700' : 
+                                asset.condition === AssetCondition.GOOD ? 'bg-blue-100 text-blue-700' :
+                                asset.condition === AssetCondition.FAIR ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                {asset.condition}
+                            </span>
+                        </td>
+                        <td className="px-6 py-3 font-medium">{asset.quantity}</td>
+                        <td className="px-6 py-3">
+                            {asset.value > 0 ? `R$ ${asset.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                        </td>
+                        <td className="px-6 py-3 font-bold text-slate-800">
+                            {asset.value > 0 ? `R$ ${(asset.value * asset.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                        </td>
+                        <td className="px-6 py-3 text-right no-print">
+                            <div className="flex items-center justify-end gap-1">
+                                <button 
+                                onClick={() => handleEdit(asset)}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full"
+                                title="Editar"
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                onClick={() => setDeleteId(asset.id)}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                                title="Excluir"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    ))
+                ) : (
+                    <tr>
+                        <td colSpan={isSelectionMode ? 9 : 8} className="px-6 py-12 text-center text-slate-400">
+                            Nenhum bem cadastrado.
+                        </td>
+                    </tr>
+                )}
+                </tbody>
+            </table>
+            </div>
         </div>
-      </div>
+      </>
+      )}
+
       {/* Modals unchanged */}
       {deleteId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 animate-fade-in no-print">
@@ -419,8 +537,9 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                        <label className="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
                        <div className="relative">
                           <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input required type="number" step="0.01" className="w-full pl-9 p-2 border rounded-lg focus:ring-blue-500"
-                            value={formData.value || 0} onChange={e => setFormData({...formData, value: Number(e.target.value)})} />
+                          <input type="number" step="0.01" className="w-full pl-9 p-2 border rounded-lg focus:ring-blue-500"
+                            placeholder="0,00 (Opcional)"
+                            value={formData.value || ''} onChange={e => setFormData({...formData, value: Number(e.target.value)})} />
                        </div>
                    </div>
 

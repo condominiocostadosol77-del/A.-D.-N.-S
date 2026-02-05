@@ -10,7 +10,8 @@ import {
   Settings,
   Gavel,
   Package,
-  Hammer
+  Hammer,
+  FileText
 } from 'lucide-react';
 import { Sector } from '../types';
 
@@ -43,6 +44,7 @@ const Layout: React.FC<LayoutProps> = ({
     { id: 'disciplines', label: 'Disciplina', icon: Gavel },
     { id: 'assets', label: 'Patrimônio', icon: Package },
     { id: 'works', label: 'Obras/Reformas', icon: Hammer },
+    { id: 'minutes', label: 'Atas e Documentos', icon: FileText },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 

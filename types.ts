@@ -121,6 +121,14 @@ export enum WorkStatus {
   PAUSED = 'Paralisada'
 }
 
+export enum WorkCategory {
+  CONSTRUCTION = 'Construção',
+  REFORM = 'Reforma',
+  MATERIAL_PURCHASE = 'Compra de Materiais',
+  MAINTENANCE = 'Manutenção Predial',
+  DECORATION = 'Decoração/Acabamento'
+}
+
 export interface WorkProject {
   id: string;
   title: string;
@@ -128,6 +136,7 @@ export interface WorkProject {
   startDate: string;
   endDate?: string;
   status: WorkStatus;
+  category?: WorkCategory; // Novo campo
   totalCost: number;
   sector: string;
   responsible?: string;

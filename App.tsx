@@ -7,6 +7,7 @@ import Settings from './pages/Settings';
 import Disciplines from './pages/Disciplines';
 import Assets from './pages/Assets';
 import Works from './pages/Works';
+import Minutes from './pages/Minutes';
 import * as storage from './services/storage';
 import { Sector } from './types';
 
@@ -81,6 +82,7 @@ const App: React.FC = () => {
       case 'disciplines': return <Disciplines currentSector={currentSector} sectors={sectors} />;
       case 'assets': return <Assets currentSector={currentSector} sectors={sectors} />;
       case 'works': return <Works currentSector={currentSector} sectors={sectors} />;
+      case 'minutes': return <Minutes currentSector={currentSector} sectors={sectors} />;
       case 'settings': return <Settings sectors={sectors} onUpdateSectors={handleUpdateSectors} currentUserEmail={userEmail} />;
       default: return <Dashboard currentSector={currentSector} sectors={sectors} />;
     }
