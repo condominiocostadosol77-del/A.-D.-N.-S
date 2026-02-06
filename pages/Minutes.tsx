@@ -23,9 +23,12 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
   const [donationData, setDonationData] = useState({
     date: new Date().toISOString().split('T')[0],
     donorName: '',
+    donorDoc: '', // RG ou CPF opcional para ficar mais formal
     itemDescription: '',
     value: '',
-    receiverName: '',
+    pastorName: '',
+    secretary1: '',
+    secretary2: '',
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
   });
 
@@ -95,7 +98,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
             className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'donation' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <Gift className="w-4 h-4" />
-          Ata de Donativo
+          Termo de Doação
           {activeTab === 'donation' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
         <button 
@@ -115,11 +118,11 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
         {activeTab === 'donation' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
              <div className="col-span-2 mb-2">
-                <h3 className="font-semibold text-slate-700">Dados da Doação</h3>
+                <h3 className="font-semibold text-slate-700">Dados da Doação e Diretoria</h3>
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Data do Recebimento</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data do Termo</label>
                 <input type="date" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                   value={donationData.date} onChange={e => setDonationData({...donationData, date: e.target.value})} />
              </div>
@@ -132,17 +135,24 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
                  </select>
              </div>
 
-             <div className="col-span-2">
+             <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Doador</label>
                 <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                   placeholder="Nome completo de quem doou"
                   value={donationData.donorName} onChange={e => setDonationData({...donationData, donorName: e.target.value})} />
              </div>
 
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">RG/CPF do Doador (Opcional)</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  placeholder="Para fins de registro"
+                  value={donationData.donorDoc} onChange={e => setDonationData({...donationData, donorDoc: e.target.value})} />
+             </div>
+
              <div className="col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Item / Bem</label>
                 <textarea className="w-full p-2 border rounded-lg focus:ring-emerald-500" rows={2}
-                  placeholder="Ex: 01 Geladeira marca X, usada em bom estado..."
+                  placeholder="Ex: 01 Geladeira marca X, modelo Y, nº de série Z, cor branca, em bom estado de conservação..."
                   value={donationData.itemDescription} onChange={e => setDonationData({...donationData, itemDescription: e.target.value})} />
              </div>
 
@@ -154,10 +164,21 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Recebido Por (Representante)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pastor Responsável</label>
                 <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
-                  placeholder="Nome de quem recebeu"
-                  value={donationData.receiverName} onChange={e => setDonationData({...donationData, receiverName: e.target.value})} />
+                  value={donationData.pastorName} onChange={e => setDonationData({...donationData, pastorName: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">1º Secretário(a)</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={donationData.secretary1} onChange={e => setDonationData({...donationData, secretary1: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">2º Secretário(a)</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={donationData.secretary2} onChange={e => setDonationData({...donationData, secretary2: e.target.value})} />
              </div>
           </div>
         )}
@@ -258,7 +279,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
             </p>
             <div className="w-24 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
             <h2 className="text-lg font-bold uppercase underline mt-8">
-               {activeTab === 'donation' ? 'ATA DE RECEBIMENTO DE DONATIVO' : 'ATA DE CERIMÔNIA DE CASAMENTO'}
+               {activeTab === 'donation' ? 'TERMO DE DOAÇÃO VOLUNTÁRIA E TRANSFERÊNCIA DE BENS' : 'ATA DE CERIMÔNIA DE CASAMENTO'}
             </h2>
          </div>
 
@@ -266,47 +287,74 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
          {activeTab === 'donation' && (
             <div className="font-serif leading-loose text-slate-800 space-y-6">
                <p>
-                  Aos <span className="font-bold">{getLongDate(donationData.date)}</span>, 
-                  a Igreja Evangélica Assembleia de Deus – Ministério Taubaté – Setor Natividade da Serra, 
-                  situada na localidade de {getSectorName(donationData.sector)}, 
-                  representada neste ato por <span className="font-bold uppercase">{donationData.receiverName || '__________________________'}</span>, 
-                  declara para os devidos fins que recebeu, a título de <span className="font-bold">DOAÇÃO VOLUNTÁRIA E DEFINITIVA</span>, 
-                  sem quaisquer ônus ou encargos para a instituição, o(s) seguinte(s) bem(ns):
+                  Pelo presente instrumento, de um lado, a <span className="font-bold">IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS – MINISTÉRIO TAUBATÉ – SETOR NATIVIDADE DA SERRA</span>, 
+                  organização religiosa sem fins lucrativos, doravante denominada simplesmente <span className="font-bold">DONATÁRIA</span>, e de outro lado, o(a) Sr(a).
+                  <span className="font-bold uppercase"> {donationData.donorName || '__________________________'}</span>
+                  {donationData.donorDoc ? `, portador(a) do documento nº ${donationData.donorDoc}` : ''}, 
+                  doravante denominado(a) <span className="font-bold">DOADOR(A)</span>, têm entre si justo e contratado o seguinte:
                </p>
 
-               <div className="my-8 p-6 border border-slate-300 bg-slate-50 print:bg-transparent print:border-slate-400 rounded">
-                  <p className="font-bold mb-2">Descrição do Bem:</p>
-                  <p className="whitespace-pre-wrap italic">{donationData.itemDescription || '_____________________________________________________________________'}</p>
-                  
-                  <div className="mt-4 flex gap-2">
-                     <span className="font-bold">Valor Estimado:</span> 
-                     <span>{donationData.value ? `R$ ${donationData.value}` : '_________________'}</span>
+               <div className="space-y-4">
+                  <p>
+                     <span className="font-bold decoration-slate-400 underline">CLÁUSULA PRIMEIRA - DA NATUREZA DA DOAÇÃO:</span><br/>
+                     O(A) DOADOR(A), movido(a) por fé e liberalidade, realiza este ato de forma totalmente voluntária, espontânea e gratuita, sem qualquer coação ou vício de consentimento. 
+                     A doação tem por objetivo contribuir para a manutenção do templo, o sustento das atividades eclesiásticas e o fomento das obras de assistência social da Igreja.
+                  </p>
+
+                  <p>
+                     <span className="font-bold decoration-slate-400 underline">CLÁUSULA SEGUNDA - DO OBJETO:</span><br/>
+                     O objeto da presente doação consiste no bem abaixo descrito e avaliado:
+                  </p>
+
+                  <div className="my-2 p-4 border border-slate-800 bg-slate-50 print:bg-transparent rounded">
+                     <p className="font-bold mb-1 uppercase">Descrição Detalhada:</p>
+                     <p className="whitespace-pre-wrap italic text-justify leading-normal">{donationData.itemDescription || '_____________________________________________________________________'}</p>
+                     
+                     <div className="mt-2 flex gap-2 justify-end">
+                        <span className="font-bold">Valor Estimado:</span> 
+                        <span>{donationData.value ? `R$ ${donationData.value}` : '_________________'}</span>
+                     </div>
                   </div>
+
+                  <p>
+                     <span className="font-bold decoration-slate-400 underline">CLÁUSULA TERCEIRA - DA DESTINAÇÃO E PROPRIEDADE:</span><br/>
+                     O(A) DOADOR(A) declara que o bem ora doado é de sua legítima propriedade e origem lícita, transferindo à DONATÁRIA, a partir desta data, a plena posse, 
+                     domínio e propriedade do referido bem, para que seja incorporado definitivamente ao patrimônio da Igreja e utilizado conforme suas finalidades estatutárias.
+                  </p>
+
+                  <p>
+                     <span className="font-bold decoration-slate-400 underline">CLÁUSULA QUARTA - DA IRREVOGABILIDADE:</span><br/>
+                     A presente doação é feita em caráter irrevogável e irretratável, renunciando o(a) DOADOR(A), seus herdeiros e sucessores, a qualquer direito de reivindicação futura sobre o bem doado.
+                  </p>
                </div>
 
-               <p>
-                  O doador, Sr(a). <span className="font-bold uppercase">{donationData.donorName || '__________________________'}</span>, 
-                  declara ser o legítimo proprietário do bem acima descrito e o transfere livre e desembaraçado de quaisquer dívidas 
-                  ou litígios, transferindo a posse e a propriedade plena para a Igreja a partir desta data.
+               <p className="mt-6">
+                  E por ser a expressão da verdade e da livre vontade das partes, firmam o presente termo.
                </p>
 
-               <p>
-                  Por ser verdade, firmam o presente documento.
+               <p className="text-right mt-8">
+                  Natividade da Serra, {getLongDate(donationData.date)}.
                </p>
 
-               <div className="mt-20 flex flex-col gap-16 items-center">
-                   <div className="text-center w-full max-w-md">
-                       <div className="border-t border-black pt-2 mb-1">
-                          <span className="font-bold uppercase">{donationData.donorName}</span>
-                       </div>
-                       <p className="text-sm">Doador(a)</p>
+               <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm font-sans break-inside-avoid">
+                   <div className="col-span-2 w-2/3 mx-auto">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{donationData.donorName}</div>
+                       <p className="text-xs">Assinatura do(a) Doador(a)</p>
                    </div>
 
-                   <div className="text-center w-full max-w-md">
-                       <div className="border-t border-black pt-2 mb-1">
-                          <span className="font-bold uppercase">{donationData.receiverName}</span>
-                       </div>
-                       <p className="text-sm">Representante da Igreja (Recebedor)</p>
+                   <div className="col-span-2 w-2/3 mx-auto mt-8">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{donationData.pastorName}</div>
+                       <p className="text-xs">Pastor Responsável</p>
+                   </div>
+
+                   <div className="mt-4">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{donationData.secretary1}</div>
+                       <p className="text-xs">1º Secretário(a)</p>
+                   </div>
+
+                   <div className="mt-4">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{donationData.secretary2}</div>
+                       <p className="text-xs">2º Secretário(a)</p>
                    </div>
                </div>
             </div>
@@ -345,7 +393,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
                   pelo celebrante e pelas testemunhas presentes.
                </p>
 
-               <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm">
+               <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm break-inside-avoid">
                    <div>
                        <div className="border-t border-black pt-2 mb-1 font-bold uppercase">{weddingData.groomName}</div>
                        <p>O Noivo</p>

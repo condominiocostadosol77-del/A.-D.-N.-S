@@ -307,26 +307,26 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                 </p>
 
                 <div className="my-6">
-                    <table className="w-full border-collapse border border-slate-800 text-sm">
+                    <table className="w-full border-collapse border border-slate-800 text-sm table-fixed">
                         <thead>
                             <tr className="bg-slate-100">
-                                <th className="border border-slate-600 px-2 py-1 text-center">Qtd</th>
-                                <th className="border border-slate-600 px-2 py-1 text-left">Item / Descrição</th>
-                                <th className="border border-slate-600 px-2 py-1 text-center">Condição</th>
-                                <th className="border border-slate-600 px-2 py-1 text-center">Nº Tombo/ID</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center w-[10%]">Qtd</th>
+                                <th className="border border-slate-600 px-2 py-1 text-left w-[55%]">Item / Descrição</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center w-[15%]">Condição</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center w-[20%]">Nº Tombo/ID</th>
                             </tr>
                         </thead>
                         <tbody>
                             {itemsForMinute.map(asset => (
-                                <tr key={asset.id}>
-                                    <td className="border border-slate-600 px-2 py-1 text-center">{asset.quantity}</td>
-                                    <td className="border border-slate-600 px-2 py-1">
-                                        <span className="font-bold uppercase">{asset.name}</span>
-                                        {asset.description && <span className="block text-xs italic">{asset.description}</span>}
-                                        {asset.location && <span className="block text-xs text-slate-500">Local: {asset.location}</span>}
+                                <tr key={asset.id} className="break-inside-avoid">
+                                    <td className="border border-slate-600 px-2 py-1 text-center align-top">{asset.quantity}</td>
+                                    <td className="border border-slate-600 px-2 py-1 align-top break-words">
+                                        <span className="font-bold uppercase block">{asset.name}</span>
+                                        {asset.description && <span className="block text-xs italic text-slate-600 mt-1 whitespace-pre-wrap break-words">{asset.description}</span>}
+                                        {asset.location && <span className="block text-xs text-slate-500 mt-1">Local: {asset.location}</span>}
                                     </td>
-                                    <td className="border border-slate-600 px-2 py-1 text-center">{asset.condition}</td>
-                                    <td className="border border-slate-600 px-2 py-1 text-center text-xs font-mono">{asset.id.slice(0,6)}...</td>
+                                    <td className="border border-slate-600 px-2 py-1 text-center align-top">{asset.condition}</td>
+                                    <td className="border border-slate-600 px-2 py-1 text-center text-xs font-mono align-top">{asset.id.slice(0,6)}...</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -338,12 +338,15 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                     Quaisquer divergências ou danos futuros deverão ser comunicados imediatamente à diretoria.
                 </p>
 
-                <div className="mt-20 grid grid-cols-2 gap-16 text-center text-sm font-sans">
-                   <div>
-                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">1º Tesoureiro / Conferente</div>
+                <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-center text-sm font-sans break-inside-avoid">
+                   <div className="order-1 md:order-1">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">Pastor</div>
                    </div>
-                   <div>
-                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">Zelador / Responsável Local</div>
+                   <div className="order-2 md:order-2">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">1º Secretário(a)</div>
+                   </div>
+                   <div className="order-3 md:order-3">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">2º Secretário(a)</div>
                    </div>
                 </div>
              </div>

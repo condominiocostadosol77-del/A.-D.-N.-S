@@ -388,12 +388,15 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                     Por ser verdade, firmamos o presente rol.
                 </p>
 
-                <div className="mt-20 grid grid-cols-2 gap-16 text-center text-sm font-sans">
-                   <div>
+                <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-center text-sm font-sans break-inside-avoid">
+                   <div className="order-1">
                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">Pastor</div>
                    </div>
-                   <div>
+                   <div className="order-2">
                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">1º Secretário(a)</div>
+                   </div>
+                   <div className="order-3">
+                       <div className="border-t border-black pt-2 mb-1 uppercase font-bold">2º Secretário(a)</div>
                    </div>
                 </div>
              </div>

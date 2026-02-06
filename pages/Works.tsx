@@ -179,13 +179,25 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
       }
   };
 
+  const handlePrint = () => {
+    if (isSelectionMode && selectedIds.size === 0) {
+        alert("Selecione pelo menos um registro para imprimir.");
+        return;
+    }
+    window.print();
+  };
+
   const filteredWorks = works
     .filter(w => currentSector === 'ALL' || w.sector === currentSector)
     .filter(w => w.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Items to display (or print in minute)
+  // Items to display (or print in minute/report)
   const displayedWorks = filteredWorks;
-  const itemsForMinute = isSelectionMode && selectedIds.size > 0 
+  
+  // Logic updated: worksToRender determines what is shown in the list.
+  // If selection mode is ON and items are selected, show only those.
+  // Otherwise show all filtered items.
+  const worksToRender = isSelectionMode && selectedIds.size > 0 
       ? displayedWorks.filter(w => selectedIds.has(w.id))
       : displayedWorks;
 
@@ -244,6 +256,12 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                             className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors"
                         >
                             Cancelar
+                        </button>
+                        <button 
+                            onClick={handlePrint}
+                            className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-2"
+                        >
+                            <Printer className="w-4 h-4" /> Imprimir ({selectedIds.size})
                         </button>
                     </>
                 ) : (
@@ -331,23 +349,23 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                 </p>
 
                 <div className="my-6">
-                    <table className="w-full border-collapse border border-slate-800 text-sm print:text-xs">
+                    {/* Tabela de Itens para Ata */}
+                    <table className="w-full border-collapse border border-slate-800 text-sm print:text-xs table-fixed">
                         <thead>
                             <tr className="bg-slate-100">
                                 <th className="border border-slate-600 px-2 py-1 text-left w-[15%]">Categoria</th>
-                                <th className="border border-slate-600 px-2 py-1 text-left">Descrição / Detalhes</th>
-                                <th className="border border-slate-600 px-2 py-1 text-center w-[12%]">Data</th>
+                                <th className="border border-slate-600 px-2 py-1 text-left w-[55%]">Descrição / Detalhes</th>
+                                <th className="border border-slate-600 px-2 py-1 text-center w-[15%]">Data</th>
                                 <th className="border border-slate-600 px-2 py-1 text-right w-[15%]">Custo Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {itemsForMinute.map(work => (
+                            {worksToRender.map(work => (
                                 <tr key={work.id} className="break-inside-avoid">
-                                    <td className="border border-slate-600 px-2 py-1 font-bold align-top">{work.category || WorkCategory.CONSTRUCTION}</td>
-                                    <td className="border border-slate-600 px-2 py-1 align-top">
+                                    <td className="border border-slate-600 px-2 py-1 font-bold align-top break-words">{work.category || WorkCategory.CONSTRUCTION}</td>
+                                    <td className="border border-slate-600 px-2 py-1 align-top break-words">
                                         <span className="uppercase font-semibold block">{work.title}</span>
-                                        {/* Descrição detalhada adicionada à Ata */}
-                                        <span className="block text-justify mt-1 text-slate-700 whitespace-pre-wrap">{work.description}</span>
+                                        <span className="block text-justify mt-1 text-slate-700 whitespace-pre-wrap break-words">{work.description}</span>
                                         {work.responsible && <span className="block text-xs italic mt-1 text-slate-500">Resp: {work.responsible}</span>}
                                     </td>
                                     <td className="border border-slate-600 px-2 py-1 text-center align-top">{new Date(work.startDate).toLocaleDateString('pt-BR')}</td>
@@ -359,7 +377,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                              <tr className="bg-slate-100 font-bold break-inside-avoid">
                                  <td colSpan={3} className="border border-slate-600 px-2 py-1 text-right">TOTAL APROVADO:</td>
                                  <td className="border border-slate-600 px-2 py-1 text-right">
-                                     R$ {itemsForMinute.reduce((acc, curr) => acc + curr.totalCost, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                     R$ {worksToRender.reduce((acc, curr) => acc + curr.totalCost, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                  </td>
                              </tr>
                         </tfoot>
@@ -419,8 +437,8 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
 
         {/* Grid de Obras - Layout otimizado para impressão de Relatório (Tela Inicial) */}
         <div className="grid grid-cols-1 gap-6">
-            {displayedWorks.length > 0 ? (
-            displayedWorks.map((work) => {
+            {worksToRender.length > 0 ? (
+            worksToRender.map((work) => {
                 // Compatibilidade com legado
                 const images = work.receiptUrls && work.receiptUrls.length > 0 
                     ? work.receiptUrls 
@@ -534,7 +552,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
             ) : (
             <div className="bg-white p-12 rounded-xl text-center text-slate-400 border border-slate-100">
                 <Hammer className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>Nenhuma obra, reforma ou compra registrada.</p>
+                <p>Nenhuma obra, reforma ou compra encontrada.</p>
             </div>
             )}
         </div>
