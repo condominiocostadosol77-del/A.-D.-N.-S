@@ -432,7 +432,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              <div className="col-span-2">
                 <div className="flex justify-between items-center mb-1">
                     <label className="block text-sm font-medium text-slate-700">
-                        O que ocorreu na reunião? (Anotações)
+                        Texto da Ata (Corpo do Documento)
                     </label>
                     <button 
                         onClick={() => handleCorrectSpelling('meeting', 'rawContent', meetingData.rawContent)}
@@ -440,36 +440,19 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
                         className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
                     >
                         <Sparkles className="w-3 h-3" />
-                        Corrigir Ortografia
+                        Corrigir Ortografia (IA)
                     </button>
                 </div>
                 <textarea 
-                  className="w-full p-3 border rounded-lg focus:ring-emerald-500 min-h-[150px]" 
-                  rows={6}
-                  placeholder="Descreva aqui os assuntos tratados, decisões tomadas, quem falou, etc. Ex: O Pastor iniciou a reunião orando. Foi tratado sobre a reforma do telhado. O irmão João sugeriu fazer um mutirão..."
+                  className="w-full p-3 border rounded-lg focus:ring-emerald-500 min-h-[300px] font-serif leading-relaxed" 
+                  rows={12}
+                  placeholder="Digite o texto da ata aqui. Ex: Aos vinte dias do mês de fevereiro... reuniu-se a igreja..."
                   value={meetingData.rawContent} 
                   onChange={e => setMeetingData({...meetingData, rawContent: e.target.value})} 
                 />
-             </div>
-
-             <div className="col-span-2 flex justify-end">
-                <button 
-                    onClick={handleGenerateMinute}
-                    disabled={isGenerating || !meetingData.rawContent}
-                    className="bg-emerald-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                >
-                    {isGenerating ? (
-                        <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Gerando Ata Formal...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="w-5 h-5" />
-                            Gerar Ata Formal com IA
-                        </>
-                    )}
-                </button>
+                <p className="text-xs text-slate-500 mt-1">
+                    * O texto digitado acima aparecerá diretamente no documento para impressão.
+                </p>
              </div>
           </div>
         )}
@@ -654,35 +637,40 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
          {/* DOCUMENT BODY - MEETING */}
          {activeTab === 'meeting' && (
             <div className="font-serif leading-loose text-slate-800 space-y-6">
-                {/* Se não houver conteúdo gerado, mostrar placeholder ou o conteúdo raw formatado */}
-                {meetingData.generatedContent ? (
-                    <div className="whitespace-pre-wrap text-justify">
-                        {meetingData.generatedContent}
-                    </div>
-                ) : (
-                    <div className="text-slate-400 italic text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
-                        {meetingData.rawContent ? (
-                            <p>Clique em "Gerar Ata Formal" para visualizar o documento final.</p>
-                        ) : (
-                            <p>Preencha os dados da reunião e as anotações acima para gerar a ata.</p>
-                        )}
-                    </div>
-                )}
+                {/* Header da Ata (Data e Horário) */}
+                <p>
+                    Aos <span className="font-bold">{getLongDate(meetingData.date)}</span>, 
+                    com início às {meetingData.time} e término às {meetingData.endTime}, 
+                    reuniu-se a Igreja para {meetingData.type}, 
+                    sob a presidência de <span className="font-bold uppercase">{meetingData.president || '____________________'}</span>.
+                </p>
+
+                {/* Conteúdo da Ata */}
+                <div className="whitespace-pre-wrap text-justify min-h-[200px]">
+                    {meetingData.rawContent || (
+                        <span className="text-slate-300 italic">
+                            (O texto da ata digitado acima aparecerá aqui...)
+                        </span>
+                    )}
+                </div>
+
+                {/* Encerramento Padrão se não estiver no texto */}
+                <p>
+                    Nada mais havendo a tratar, lavrei a presente ata que vai assinada por mim e pelo presidente.
+                </p>
 
                 {/* Assinaturas da Ata de Reunião */}
-                {meetingData.generatedContent && (
-                    <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm break-inside-avoid">
-                        <div className="col-span-2 w-2/3 mx-auto mt-8">
-                            <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.president || '____________________'}</div>
-                            <p>Presidente / Dirigente</p>
-                        </div>
-
-                        <div className="col-span-2 w-2/3 mx-auto mt-4">
-                            <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary || '____________________'}</div>
-                            <p>Secretário(a)</p>
-                        </div>
+                <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm break-inside-avoid">
+                    <div className="col-span-2 w-2/3 mx-auto mt-8">
+                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.president || '____________________'}</div>
+                        <p>Presidente / Dirigente</p>
                     </div>
-                )}
+
+                    <div className="col-span-2 w-2/3 mx-auto mt-4">
+                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary || '____________________'}</div>
+                        <p>Secretário(a)</p>
+                    </div>
+                </div>
             </div>
          )}
          
