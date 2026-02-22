@@ -82,7 +82,8 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
     endTime: '21:00',
     type: 'Reunião Ordinária', // Ordinária, Extraordinária, Diretoria, Obreiros
     president: '',
-    secretary: '',
+    secretary1: '',
+    secretary2: '',
     rawContent: '', // O que o usuário digita
     generatedContent: '', // O que a IA gera
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
@@ -155,7 +156,12 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
       setWeddingData(minute.content);
     } else if (minute.type === MinuteTypeEnum.MEETING) {
       setActiveTab('meeting');
-      setMeetingData(minute.content);
+      // Migration for old data structure
+      const content = { ...minute.content };
+      if (content.secretary && !content.secretary1) {
+          content.secretary1 = content.secretary;
+      }
+      setMeetingData(content);
     }
     setShowSavedList(false);
   };
@@ -201,15 +207,16 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
         - Horário Início: ${meetingData.time}
         - Horário Término: ${meetingData.endTime}
         - Tipo: ${meetingData.type}
-        - Presidente: ${meetingData.president}
-        - Secretário: ${meetingData.secretary}
+        - Dirigente: ${meetingData.president}
+        - 1º Secretário: ${meetingData.secretary1}
+        - 2º Secretário: ${meetingData.secretary2}
         - Local/Setor: ${getSectorName(meetingData.sector)}
 
         Anotações (O que ocorreu):
         "${meetingData.rawContent}"
 
         Instruções:
-        1. Escreva o texto corrido da ata, começando com a data e horário de início, quem presidiu, e narrando os fatos de forma formal e eclesiástica.
+        1. Escreva o texto corrido da ata, começando com a data e horário de início, quem presidiu (Dirigente), e narrando os fatos de forma formal e eclesiástica.
         2. Corrija qualquer erro de português.
         3. Use termos adequados ao ambiente de igreja (ex: "irmãos", "paz do Senhor", "deliberações").
         4. Finalize com o encerramento padrão de uma ata, mencionando o horário de término ("Nada mais havendo a tratar, encerrou-se a reunião às ${meetingData.endTime}...").
@@ -640,15 +647,21 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Presidente / Dirigente</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Dirigente</label>
                 <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                   value={meetingData.president} onChange={e => setMeetingData({...meetingData, president: e.target.value})} />
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Secretário(a)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">1º Secretário(a)</label>
                 <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
-                  value={meetingData.secretary} onChange={e => setMeetingData({...meetingData, secretary: e.target.value})} />
+                  value={meetingData.secretary1} onChange={e => setMeetingData({...meetingData, secretary1: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">2º Secretário(a)</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.secretary2} onChange={e => setMeetingData({...meetingData, secretary2: e.target.value})} />
              </div>
 
              <div className="col-span-2">
@@ -885,12 +898,17 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
                 <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm break-inside-avoid">
                     <div className="col-span-2 w-2/3 mx-auto mt-8">
                         <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.president || '____________________'}</div>
-                        <p>Presidente / Dirigente</p>
+                        <p>Dirigente</p>
                     </div>
 
-                    <div className="col-span-2 w-2/3 mx-auto mt-4">
-                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary || '____________________'}</div>
-                        <p>Secretário(a)</p>
+                    <div className="mt-4">
+                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary1 || '____________________'}</div>
+                        <p>1º Secretário(a)</p>
+                    </div>
+
+                    <div className="mt-4">
+                        <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary2 || '____________________'}</div>
+                        <p>2º Secretário(a)</p>
                     </div>
                 </div>
             </div>
