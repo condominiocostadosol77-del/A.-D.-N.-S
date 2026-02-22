@@ -155,7 +155,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     }
   };
 
-  const handleCorrectSpelling = async (field: 'description', value: string) => {
+  const handleCorrectSpelling = async (field: 'description' | 'title', value: string) => {
       if (!value) return;
       setIsCorrecting(true);
       try {
@@ -638,7 +638,18 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    </div>
 
                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Título / Item Principal</label>
+                      <div className="flex justify-between items-center mb-1">
+                          <label className="block text-sm font-medium text-slate-700">Título / Item Principal</label>
+                          <button 
+                              type="button"
+                              onClick={() => handleCorrectSpelling('title', formData.title || '')}
+                              disabled={isCorrecting || !formData.title}
+                              className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                          >
+                              <Sparkles className="w-3 h-3" />
+                              Corrigir
+                          </button>
+                      </div>
                       <input required type="text" className="w-full p-2 border rounded-lg focus:ring-amber-500"
                         placeholder={formData.category === WorkCategory.MATERIAL_PURCHASE ? "Ex: Compra de Cimento e Areia" : "Ex: Reforma do Telhado"}
                         value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />

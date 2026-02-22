@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Printer, 
@@ -6,9 +6,17 @@ import {
   Heart, 
   Users,
   Sparkles,
-  Loader2
+  Loader2,
+  Save,
+  Trash2,
+  Clock,
+  Search,
+  Eye,
+  ArrowLeft,
+  CheckCircle2
 } from 'lucide-react';
-import { Sector } from '../types';
+import { Sector, Minute, MinuteType as MinuteTypeEnum } from '../types';
+import { saveMinute, getMinutes, deleteMinute } from '../services/storage';
 import { GoogleGenAI } from "@google/genai";
 
 interface MinutesProps {
@@ -16,11 +24,27 @@ interface MinutesProps {
   sectors: Sector[];
 }
 
-type MinuteType = 'donation' | 'wedding' | 'meeting';
+type TabType = 'donation' | 'wedding' | 'meeting';
 
 const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
-  const [activeTab, setActiveTab] = useState<MinuteType>('donation');
+  const [activeTab, setActiveTab] = useState<TabType>('donation');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Saved Minutes State
+  const [savedMinutes, setSavedMinutes] = useState<Minute[]>([]);
+  const [showSavedList, setShowSavedList] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    loadSavedMinutes();
+  }, []);
+
+  const loadSavedMinutes = async () => {
+    const minutes = await getMinutes();
+    setSavedMinutes(minutes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  };
 
   // Donation State
   const [donationData, setDonationData] = useState({
@@ -66,6 +90,74 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
 
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
+  };
+
+  const handleSaveMinute = async () => {
+    setIsSaving(true);
+    try {
+      let type: MinuteTypeEnum;
+      let content: any;
+      let date: string;
+      let sector: string;
+
+      if (activeTab === 'donation') {
+        type = MinuteTypeEnum.DONATION;
+        content = donationData;
+        date = donationData.date;
+        sector = donationData.sector;
+      } else if (activeTab === 'wedding') {
+        type = MinuteTypeEnum.WEDDING;
+        content = weddingData;
+        date = weddingData.date;
+        sector = weddingData.sector;
+      } else {
+        type = MinuteTypeEnum.MEETING;
+        content = meetingData;
+        date = meetingData.date;
+        sector = meetingData.sector;
+      }
+
+      const newMinute: Minute = {
+        id: editingId || crypto.randomUUID(),
+        type,
+        date,
+        sector,
+        content,
+        createdAt: new Date().toISOString()
+      };
+
+      await saveMinute(newMinute);
+      if (!editingId) setEditingId(newMinute.id); // Set ID if it was a new creation
+      await loadSavedMinutes();
+      alert('Documento salvo com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar documento:', error);
+      alert('Erro ao salvar documento.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteMinute = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este documento salvo?')) {
+      await deleteMinute(id);
+      await loadSavedMinutes();
+    }
+  };
+
+  const handleLoadMinute = (minute: Minute) => {
+    setEditingId(minute.id);
+    if (minute.type === MinuteTypeEnum.DONATION) {
+      setActiveTab('donation');
+      setDonationData(minute.content);
+    } else if (minute.type === MinuteTypeEnum.WEDDING) {
+      setActiveTab('wedding');
+      setWeddingData(minute.content);
+    } else if (minute.type === MinuteTypeEnum.MEETING) {
+      setActiveTab('meeting');
+      setMeetingData(minute.content);
+    }
+    setShowSavedList(false);
   };
 
   const getLongDate = (dateStr: string) => {
@@ -137,7 +229,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
     }
   };
 
-  const handleCorrectSpelling = async (section: 'meeting' | 'donation', field: string, value: string) => {
+  const handleCorrectSpelling = async (section: 'meeting' | 'donation' | 'wedding', field: string, value: string) => {
       if (!value) return;
       setIsGenerating(true); // Reusing loading state
       try {
@@ -157,6 +249,8 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
               setMeetingData(prev => ({ ...prev, [field]: text.trim() }));
           } else if (section === 'donation') {
               setDonationData(prev => ({ ...prev, [field]: text.trim() }));
+          } else if (section === 'wedding') {
+              setWeddingData(prev => ({ ...prev, [field]: text.trim() }));
           }
       } catch (error) {
           console.error("Erro na correção:", error);
@@ -164,6 +258,13 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
           setIsGenerating(false);
       }
   }
+
+  // Reset editing state when switching tabs manually
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setEditingId(null);
+    // Optionally reset form data here if desired, but keeping it might be useful
+  };
 
   return (
     <div className="space-y-6">
@@ -175,21 +276,132 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
             Emissão de Atas e Documentos
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-             Gere documentos oficiais prontos para impressão e assinatura.
+             {editingId ? <span className="text-emerald-600 font-semibold">Editando Documento Salvo</span> : 'Gere, salve e imprima documentos oficiais.'}
           </p>
         </div>
-        <button 
-            onClick={handlePrint}
-            className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors shadow-sm"
-        >
-            <Printer className="w-4 h-4" />
-            Imprimir Documento
-        </button>
+        <div className="flex gap-2">
+            {showSavedList ? (
+                <button 
+                    onClick={() => setShowSavedList(false)}
+                    className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors flex items-center gap-2"
+                >
+                    <ArrowLeft className="w-4 h-4" /> Voltar
+                </button>
+            ) : (
+                <>
+                    <button 
+                        onClick={() => {
+                            setEditingId(null);
+                            setShowSavedList(true);
+                        }}
+                        className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                    >
+                        <Clock className="w-4 h-4" />
+                        Histórico Salvo
+                    </button>
+                    <button 
+                        onClick={handleSaveMinute}
+                        disabled={isSaving}
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Salvar
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-900 transition-colors shadow-sm"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir
+                    </button>
+                </>
+            )}
+        </div>
       </div>
 
+      {showSavedList ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 animate-fade-in">
+            <div className="flex items-center gap-4 mb-6">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <input 
+                        type="text" 
+                        placeholder="Buscar documentos salvos..." 
+                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                        <tr>
+                            <th className="px-6 py-3">Data</th>
+                            <th className="px-6 py-3">Tipo</th>
+                            <th className="px-6 py-3">Setor</th>
+                            <th className="px-6 py-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {savedMinutes
+                            .filter(m => 
+                                m.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                getSectorName(m.sector).toLowerCase().includes(searchTerm.toLowerCase())
+                            )
+                            .map((minute) => (
+                            <tr key={minute.id} className="hover:bg-slate-50">
+                                <td className="px-6 py-3 font-medium text-slate-800">
+                                    {new Date(minute.date).toLocaleDateString('pt-BR')}
+                                </td>
+                                <td className="px-6 py-3">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        ${minute.type === MinuteTypeEnum.DONATION ? 'bg-blue-100 text-blue-800' : 
+                                          minute.type === MinuteTypeEnum.WEDDING ? 'bg-pink-100 text-pink-800' : 
+                                          'bg-purple-100 text-purple-800'}`}>
+                                        {minute.type}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-3">
+                                    {getSectorName(minute.sector)}
+                                </td>
+                                <td className="px-6 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button 
+                                            onClick={() => handleLoadMinute(minute)}
+                                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                                            title="Visualizar/Editar"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeleteMinute(minute.id)}
+                                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                            title="Excluir"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                        {savedMinutes.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                                    Nenhum documento salvo encontrado.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      ) : (
+        <>
       <div className="flex border-b border-slate-200 overflow-x-auto print:hidden">
         <button 
-            onClick={() => setActiveTab('donation')} 
+            onClick={() => handleTabChange('donation')} 
             className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'donation' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <Gift className="w-4 h-4" />
@@ -197,7 +409,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
           {activeTab === 'donation' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
         <button 
-            onClick={() => setActiveTab('wedding')} 
+            onClick={() => handleTabChange('wedding')} 
             className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'wedding' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <Heart className="w-4 h-4" />
@@ -205,7 +417,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
           {activeTab === 'wedding' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
         <button 
-            onClick={() => setActiveTab('meeting')} 
+            onClick={() => handleTabChange('meeting')} 
             className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'meeting' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <Users className="w-4 h-4" />
@@ -340,7 +552,17 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
 
              <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Dados Registro Civil (Opcional)</label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Dados Registro Civil (Opcional)</label>
+                    <button 
+                        onClick={() => handleCorrectSpelling('wedding', 'civilRegistryInfo', weddingData.civilRegistryInfo)}
+                        disabled={isGenerating || !weddingData.civilRegistryInfo}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        Corrigir Ortografia
+                    </button>
+                </div>
                 <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                   placeholder="Ex: Cartório X, Livro B-20, Folha 100..."
                   value={weddingData.civilRegistryInfo} onChange={e => setWeddingData({...weddingData, civilRegistryInfo: e.target.value})} />
@@ -679,6 +901,8 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
             <p>Documento gerado pelo Sistema de Gestão Eclesiástica - A. D. NATIVIDADE DA SERRA</p>
          </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

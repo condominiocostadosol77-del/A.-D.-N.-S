@@ -1,4 +1,4 @@
-import { Member, Transaction, User, Sector, Discipline, Asset, WorkProject } from '../types';
+import { Member, Transaction, User, Sector, Discipline, Asset, WorkProject, Minute } from '../types';
 import { db, isFirebaseInitialized } from './firebase';
 import { 
   collection, 
@@ -25,7 +25,8 @@ const KEYS = {
   USERS: 'app_users',
   SESSION: 'app_session',
   ASSETS: 'app_assets',
-  WORKS: 'app_works'
+  WORKS: 'app_works',
+  MINUTES: 'app_minutes'
 };
 
 // --- Helpers ---
@@ -235,6 +236,11 @@ export const deleteAsset = (id: string) => deleteItem('assets', KEYS.ASSETS, id)
 export const getWorks = () => getCollection<WorkProject>('works', KEYS.WORKS);
 export const saveWork = (w: WorkProject) => saveItem('works', KEYS.WORKS, w);
 export const deleteWork = (id: string) => deleteItem('works', KEYS.WORKS, id);
+
+// Minutes
+export const getMinutes = () => getCollection<Minute>('minutes', KEYS.MINUTES);
+export const saveMinute = (m: Minute) => saveItem('minutes', KEYS.MINUTES, m);
+export const deleteMinute = (id: string) => deleteItem('minutes', KEYS.MINUTES, id);
 
 // --- Seed ---
 

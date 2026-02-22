@@ -21,10 +21,12 @@ import {
   CheckSquare,
   Square,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles
 } from 'lucide-react';
 import { Member, Role, Sector } from '../types';
 import * as storage from '../services/storage';
+import { GoogleGenAI } from "@google/genai";
 
 interface MembersProps {
   currentSector: string;
@@ -40,6 +42,7 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [viewingMember, setViewingMember] = useState<Member | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   
   // State for Delete Confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -170,6 +173,34 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
     } finally {
         setIsSaving(false);
     }
+  };
+
+  const handleCorrectSpelling = async (field: 'address', value: string) => {
+      if (!value) return;
+      setIsCorrecting(true);
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+              alert("Chave de API não configurada");
+              return;
+          }
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          setFormData(prev => ({ ...prev, [field]: text.trim() }));
+      } catch (error) {
+          console.error("Erro na correção:", error);
+          alert("Erro ao corrigir texto.");
+      } finally {
+          setIsCorrecting(false);
+      }
   };
 
   // Selection Logic
@@ -721,7 +752,18 @@ const Members: React.FC<MembersProps> = ({ currentSector, sectors }) => {
                     value={formData.baptismDate || ''} onChange={e => setFormData({...formData, baptismDate: e.target.value})} />
                 </div>
                 <div className="col-span-full space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Endereço</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium text-slate-700">Endereço</label>
+                    <button 
+                        type="button"
+                        onClick={() => handleCorrectSpelling('address', formData.address || '')}
+                        disabled={isCorrecting || !formData.address}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        Corrigir Ortografia
+                    </button>
+                  </div>
                   <input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-emerald-500" 
                     value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                 </div>

@@ -121,7 +121,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     }
   };
 
-  const handleCorrectSpelling = async (field: 'description', value: string) => {
+  const handleCorrectSpelling = async (field: 'description' | 'location', value: string) => {
       if (!value) return;
       setIsCorrecting(true);
       try {
@@ -617,7 +617,18 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                    </div>
 
                    <div>
-                       <label className="block text-sm font-medium text-slate-700 mb-1">Local Específico (Opcional)</label>
+                       <div className="flex justify-between items-center mb-1">
+                           <label className="block text-sm font-medium text-slate-700">Local Específico (Opcional)</label>
+                           <button 
+                               type="button"
+                               onClick={() => handleCorrectSpelling('location', formData.location || '')}
+                               disabled={isCorrecting || !formData.location}
+                               className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                           >
+                               <Sparkles className="w-3 h-3" />
+                               Corrigir
+                           </button>
+                       </div>
                        <input type="text" className="w-full p-2 border rounded-lg focus:ring-blue-500"
                         placeholder="Ex: Sala das Crianças, Altar..."
                         value={formData.location || ''} onChange={e => setFormData({...formData, location: e.target.value})} />

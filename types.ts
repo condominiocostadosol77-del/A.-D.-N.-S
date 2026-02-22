@@ -144,3 +144,18 @@ export interface WorkProject {
   receiptUrls?: string[]; // Novo campo para múltiplos anexos
   createdAt: string;
 }
+
+export enum MinuteType {
+  MEETING = 'Reunião',
+  DONATION = 'Doação',
+  WEDDING = 'Casamento'
+}
+
+export interface Minute {
+  id: string;
+  type: MinuteType;
+  date: string;
+  sector: string;
+  content: any; // Stores the specific data for that minute type (meetingData, donationData, weddingData)
+  createdAt: string;
+}
