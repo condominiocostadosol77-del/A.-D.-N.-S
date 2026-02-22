@@ -18,10 +18,12 @@ import {
   CheckSquare,
   Square,
   Image as ImageIcon,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles
 } from 'lucide-react';
 import { WorkProject, Sector, WorkStatus, WorkCategory } from '../types';
 import * as storage from '../services/storage';
+import { GoogleGenAI } from "@google/genai";
 
 interface WorksProps {
   currentSector: string;
@@ -33,6 +35,7 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -150,6 +153,34 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
     } finally {
         setIsSaving(false);
     }
+  };
+
+  const handleCorrectSpelling = async (field: 'description', value: string) => {
+      if (!value) return;
+      setIsCorrecting(true);
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+              alert("Chave de API não configurada");
+              return;
+          }
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          setFormData(prev => ({ ...prev, [field]: text.trim() }));
+      } catch (error) {
+          console.error("Erro na correção:", error);
+          alert("Erro ao corrigir texto.");
+      } finally {
+          setIsCorrecting(false);
+      }
   };
 
   const confirmDelete = async () => {
@@ -694,9 +725,20 @@ const Works: React.FC<WorksProps> = ({ currentSector, sectors }) => {
                    </div>
 
                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {formData.category === WorkCategory.MATERIAL_PURCHASE ? "Descrição dos Materiais (Para Ata)" : "Descrição da Obra (Para Ata)"}
-                      </label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-slate-700">
+                            {formData.category === WorkCategory.MATERIAL_PURCHASE ? "Descrição dos Materiais (Para Ata)" : "Descrição da Obra (Para Ata)"}
+                        </label>
+                        <button 
+                            type="button"
+                            onClick={() => handleCorrectSpelling('description', formData.description || '')}
+                            disabled={isCorrecting || !formData.description}
+                            className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                        >
+                            <Sparkles className="w-3 h-3" />
+                            {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                        </button>
+                      </div>
                       <textarea className="w-full p-2 border rounded-lg focus:ring-amber-500 font-mono text-sm" rows={6}
                         placeholder={formData.category === WorkCategory.MATERIAL_PURCHASE ? "Ex: 10 sacos de cimento Votoran, 2 metros de areia média..." : "Liste o andamento da obra, materiais e serviços..."}
                         value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />

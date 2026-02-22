@@ -8,7 +8,8 @@ import {
   Sector 
 } from '../types';
 import * as storage from '../services/storage';
-import { Plus, Trash2, FileText, Search, AlertTriangle, Printer, Loader2, Edit2, CheckSquare, Square } from 'lucide-react';
+import { Plus, Trash2, FileText, Search, AlertTriangle, Printer, Loader2, Edit2, CheckSquare, Square, Sparkles } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 interface FinancialsProps {
   currentSector: string;
@@ -22,6 +23,7 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   
   // Edit & Delete State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -133,6 +135,34 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  const handleCorrectSpelling = async (field: 'description', value: string) => {
+      if (!value) return;
+      setIsCorrecting(true);
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+              alert("Chave de API não configurada");
+              return;
+          }
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          setFormData(prev => ({ ...prev, [field]: text.trim() }));
+      } catch (error) {
+          console.error("Erro na correção:", error);
+          alert("Erro ao corrigir texto.");
+      } finally {
+          setIsCorrecting(false);
+      }
   };
 
   const closeModal = () => {
@@ -594,7 +624,18 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
 
               {activeTab === 'offerings' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Descrição / Doador (Opcional)</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Descrição / Doador (Opcional)</label>
+                    <button 
+                        type="button"
+                        onClick={() => handleCorrectSpelling('description', formData.description || '')}
+                        disabled={isCorrecting || !formData.description}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                    </button>
+                  </div>
                   <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                     placeholder="Ex: Oferta de visitante"
                     value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
@@ -604,7 +645,18 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
               {activeTab === 'special' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Motivo da Oferta</label>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-slate-700">Motivo da Oferta</label>
+                        <button 
+                            type="button"
+                            onClick={() => handleCorrectSpelling('description', formData.description || '')}
+                            disabled={isCorrecting || !formData.description}
+                            className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                        >
+                            <Sparkles className="w-3 h-3" />
+                            {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                        </button>
+                    </div>
                     <input type="text" required className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                       placeholder="Ex: Missões África, Construção, Campanha..."
                       value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
@@ -631,7 +683,18 @@ const Financials: React.FC<FinancialsProps> = ({ currentSector, sectors }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Motivo/Descrição</label>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-slate-700">Motivo/Descrição</label>
+                        <button 
+                            type="button"
+                            onClick={() => handleCorrectSpelling('description', formData.description || '')}
+                            disabled={isCorrecting || !formData.description}
+                            className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                        >
+                            <Sparkles className="w-3 h-3" />
+                            {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                        </button>
+                    </div>
                     <input required type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                       value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
                   </div>

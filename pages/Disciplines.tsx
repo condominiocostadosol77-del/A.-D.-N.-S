@@ -16,10 +16,12 @@ import {
   CheckSquare,
   Square,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles
 } from 'lucide-react';
 import { Member, Sector, Discipline } from '../types';
 import * as storage from '../services/storage';
+import { GoogleGenAI } from "@google/genai";
 
 interface DisciplinesProps {
   currentSector: string;
@@ -32,6 +34,7 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   
   // State for Edit/Delete
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -121,6 +124,34 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
     } finally {
         setIsSaving(false);
     }
+  };
+
+  const handleCorrectSpelling = async (field: 'reason', value: string) => {
+      if (!value) return;
+      setIsCorrecting(true);
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+              alert("Chave de API não configurada");
+              return;
+          }
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          setFormData(prev => ({ ...prev, [field]: text.trim() }));
+      } catch (error) {
+          console.error("Erro na correção:", error);
+          alert("Erro ao corrigir texto.");
+      } finally {
+          setIsCorrecting(false);
+      }
   };
 
   const closeModal = () => {
@@ -620,7 +651,18 @@ const Disciplines: React.FC<DisciplinesProps> = ({ currentSector, sectors }) => 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Motivo</label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Motivo</label>
+                    <button 
+                        type="button"
+                        onClick={() => handleCorrectSpelling('reason', formData.reason || '')}
+                        disabled={isCorrecting || !formData.reason}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                    </button>
+                </div>
                 <textarea 
                   required 
                   className="w-full p-2 border rounded-lg focus:ring-emerald-500 min-h-[80px]"

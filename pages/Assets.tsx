@@ -15,10 +15,12 @@ import {
   CheckSquare,
   Square,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles
 } from 'lucide-react';
 import { Asset, Sector, AssetCondition } from '../types';
 import * as storage from '../services/storage';
+import { GoogleGenAI } from "@google/genai";
 
 interface AssetsProps {
   currentSector: string;
@@ -30,6 +32,7 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -116,6 +119,34 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
     } finally {
         setIsSaving(false);
     }
+  };
+
+  const handleCorrectSpelling = async (field: 'description', value: string) => {
+      if (!value) return;
+      setIsCorrecting(true);
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+              alert("Chave de API não configurada");
+              return;
+          }
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          setFormData(prev => ({ ...prev, [field]: text.trim() }));
+      } catch (error) {
+          console.error("Erro na correção:", error);
+          alert("Erro ao corrigir texto.");
+      } finally {
+          setIsCorrecting(false);
+      }
   };
 
   const confirmDelete = async () => {
@@ -530,7 +561,18 @@ const Assets: React.FC<AssetsProps> = ({ currentSector, sectors }) => {
                    </div>
                    
                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Descrição Detalhada (Para Ata)</label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-slate-700">Descrição Detalhada (Para Ata)</label>
+                        <button 
+                            type="button"
+                            onClick={() => handleCorrectSpelling('description', formData.description || '')}
+                            disabled={isCorrecting || !formData.description}
+                            className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                        >
+                            <Sparkles className="w-3 h-3" />
+                            {isCorrecting ? 'Corrigindo...' : 'Corrigir Ortografia'}
+                        </button>
+                      </div>
                       <textarea className="w-full p-2 border rounded-lg focus:ring-blue-500" rows={2}
                         placeholder="Ex: Cor preta, modelo X, número de série Y..."
                         value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />

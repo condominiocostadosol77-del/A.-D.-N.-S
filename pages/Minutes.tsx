@@ -4,20 +4,23 @@ import {
   Printer, 
   Gift, 
   Heart, 
-  MapPin, 
-  Calendar 
+  Users,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { Sector } from '../types';
+import { GoogleGenAI } from "@google/genai";
 
 interface MinutesProps {
   currentSector: string;
   sectors: Sector[];
 }
 
-type MinuteType = 'donation' | 'wedding';
+type MinuteType = 'donation' | 'wedding' | 'meeting';
 
 const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
   const [activeTab, setActiveTab] = useState<MinuteType>('donation');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Donation State
   const [donationData, setDonationData] = useState({
@@ -48,6 +51,18 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
     sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
   });
 
+  // Meeting State
+  const [meetingData, setMeetingData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    time: '19:30',
+    type: 'Reunião Ordinária', // Ordinária, Extraordinária, Diretoria, Obreiros
+    president: '',
+    secretary: '',
+    rawContent: '', // O que o usuário digita
+    generatedContent: '', // O que a IA gera
+    sector: currentSector === 'ALL' ? 'SEDE' : currentSector,
+  });
+
   const getSectorName = (id: string) => {
     return sectors.find(s => s.id === id)?.name || id;
   };
@@ -69,6 +84,84 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
   const handlePrint = () => {
     window.print();
   };
+
+  const handleGenerateMinute = async () => {
+    if (!meetingData.rawContent) return;
+
+    setIsGenerating(true);
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        alert("Chave de API do Gemini não configurada.");
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const prompt = `
+        Você é um secretário experiente de uma igreja evangélica Assembleia de Deus.
+        Sua tarefa é transformar as anotações informais abaixo em uma Ata de Reunião formal, bem redigida e corrigida ortograficamente.
+        
+        Detalres da Reunião:
+        - Data: ${getLongDate(meetingData.date)}
+        - Horário: ${meetingData.time}
+        - Tipo: ${meetingData.type}
+        - Presidente: ${meetingData.president}
+        - Secretário: ${meetingData.secretary}
+        - Local/Setor: ${getSectorName(meetingData.sector)}
+
+        Anotações (O que ocorreu):
+        "${meetingData.rawContent}"
+
+        Instruções:
+        1. Escreva o texto corrido da ata, começando com a data e horário, quem presidiu, e narrando os fatos de forma formal e eclesiástica.
+        2. Corrija qualquer erro de português.
+        3. Use termos adequados ao ambiente de igreja (ex: "irmãos", "paz do Senhor", "deliberações").
+        4. Finalize com o encerramento padrão de uma ata ("Nada mais havendo a tratar...").
+        5. NÃO inclua cabeçalhos (título da igreja) ou rodapés (assinaturas), pois isso já existe no layout do documento. Apenas o CORPO do texto.
+      `;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      setMeetingData(prev => ({ ...prev, generatedContent: text }));
+    } catch (error) {
+      console.error("Erro ao gerar ata:", error);
+      alert("Erro ao gerar a ata. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCorrectSpelling = async (section: 'meeting' | 'donation', field: string, value: string) => {
+      if (!value) return;
+      setIsGenerating(true); // Reusing loading state
+      try {
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) return;
+          
+          const ai = new GoogleGenAI({ apiKey });
+          const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+          
+          const prompt = `Corrija a ortografia e gramática do seguinte texto, mantendo o sentido original: "${value}"`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          if (section === 'meeting') {
+              setMeetingData(prev => ({ ...prev, [field]: text.trim() }));
+          } else if (section === 'donation') {
+              setDonationData(prev => ({ ...prev, [field]: text.trim() }));
+          }
+      } catch (error) {
+          console.error("Erro na correção:", error);
+      } finally {
+          setIsGenerating(false);
+      }
+  }
 
   return (
     <div className="space-y-6">
@@ -108,6 +201,14 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
           <Heart className="w-4 h-4" />
           Ata de Casamento
           {activeTab === 'wedding' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
+        </button>
+        <button 
+            onClick={() => setActiveTab('meeting')} 
+            className={`px-6 py-3 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'meeting' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <Users className="w-4 h-4" />
+          Ata de Reunião
+          {activeTab === 'meeting' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600"></div>}
         </button>
       </div>
 
@@ -150,7 +251,17 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
 
              <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Item / Bem</label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Descrição do Item / Bem</label>
+                    <button 
+                        onClick={() => handleCorrectSpelling('donation', 'itemDescription', donationData.itemDescription)}
+                        disabled={isGenerating || !donationData.itemDescription}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        Corrigir Ortografia
+                    </button>
+                </div>
                 <textarea className="w-full p-2 border rounded-lg focus:ring-emerald-500" rows={2}
                   placeholder="Ex: 01 Geladeira marca X, modelo Y, nº de série Z, cor branca, em bom estado de conservação..."
                   value={donationData.itemDescription} onChange={e => setDonationData({...donationData, itemDescription: e.target.value})} />
@@ -258,6 +369,102 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
           </div>
         )}
+
+        {/* MEETING FORM */}
+        {activeTab === 'meeting' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+             <div className="col-span-2 mb-2">
+                <h3 className="font-semibold text-slate-700">Dados da Reunião</h3>
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                <input type="date" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.date} onChange={e => setMeetingData({...meetingData, date: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horário</label>
+                <input type="time" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.time} onChange={e => setMeetingData({...meetingData, time: e.target.value})} />
+             </div>
+
+             <div>
+                 <label className="block text-sm font-medium text-slate-700 mb-1">Setor / Congregação</label>
+                 <select className="w-full p-2 border rounded-lg focus:ring-emerald-500 bg-slate-50"
+                    value={meetingData.sector} onChange={e => setMeetingData({...meetingData, sector: e.target.value})}>
+                    {sectors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                 </select>
+             </div>
+
+             <div>
+                 <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Reunião</label>
+                 <select className="w-full p-2 border rounded-lg focus:ring-emerald-500 bg-slate-50"
+                    value={meetingData.type} onChange={e => setMeetingData({...meetingData, type: e.target.value})}>
+                    <option value="Reunião Ordinária">Reunião Ordinária</option>
+                    <option value="Reunião Extraordinária">Reunião Extraordinária</option>
+                    <option value="Reunião de Diretoria">Reunião de Diretoria</option>
+                    <option value="Reunião de Obreiros">Reunião de Obreiros</option>
+                    <option value="Assembleia Geral">Assembleia Geral</option>
+                 </select>
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Presidente / Dirigente</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.president} onChange={e => setMeetingData({...meetingData, president: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Secretário(a)</label>
+                <input type="text" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.secretary} onChange={e => setMeetingData({...meetingData, secretary: e.target.value})} />
+             </div>
+
+             <div className="col-span-2">
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">
+                        O que ocorreu na reunião? (Anotações)
+                    </label>
+                    <button 
+                        onClick={() => handleCorrectSpelling('meeting', 'rawContent', meetingData.rawContent)}
+                        disabled={isGenerating || !meetingData.rawContent}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        Corrigir Ortografia
+                    </button>
+                </div>
+                <textarea 
+                  className="w-full p-3 border rounded-lg focus:ring-emerald-500 min-h-[150px]" 
+                  rows={6}
+                  placeholder="Descreva aqui os assuntos tratados, decisões tomadas, quem falou, etc. Ex: O Pastor iniciou a reunião orando. Foi tratado sobre a reforma do telhado. O irmão João sugeriu fazer um mutirão..."
+                  value={meetingData.rawContent} 
+                  onChange={e => setMeetingData({...meetingData, rawContent: e.target.value})} 
+                />
+             </div>
+
+             <div className="col-span-2 flex justify-end">
+                <button 
+                    onClick={handleGenerateMinute}
+                    disabled={isGenerating || !meetingData.rawContent}
+                    className="bg-emerald-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                >
+                    {isGenerating ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Gerando Ata Formal...
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="w-5 h-5" />
+                            Gerar Ata Formal com IA
+                        </>
+                    )}
+                </button>
+             </div>
+          </div>
+        )}
       </div>
 
       {/* DOCUMENT PREVIEW / PRINT AREA */}
@@ -274,12 +481,16 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
             <p className="text-sm font-medium text-slate-500 mt-1 uppercase">
                {activeTab === 'donation' 
                   ? getSectorName(donationData.sector)
-                  : getSectorName(weddingData.sector)
+                  : activeTab === 'wedding' 
+                    ? getSectorName(weddingData.sector)
+                    : getSectorName(meetingData.sector)
                }
             </p>
             <div className="w-24 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
             <h2 className="text-lg font-bold uppercase underline mt-8">
-               {activeTab === 'donation' ? 'TERMO DE DOAÇÃO VOLUNTÁRIA E TRANSFERÊNCIA DE BENS' : 'ATA DE CERIMÔNIA DE CASAMENTO'}
+               {activeTab === 'donation' ? 'TERMO DE DOAÇÃO VOLUNTÁRIA E TRANSFERÊNCIA DE BENS' : 
+                activeTab === 'wedding' ? 'ATA DE CERIMÔNIA DE CASAMENTO' : 
+                `ATA DE ${meetingData.type.toUpperCase()}`}
             </h2>
          </div>
 
@@ -429,6 +640,41 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
                        <p>2º Secretário(a)</p>
                    </div>
                </div>
+            </div>
+         )}
+
+         {/* DOCUMENT BODY - MEETING */}
+         {activeTab === 'meeting' && (
+            <div className="font-serif leading-loose text-slate-800 space-y-6">
+                {/* Se não houver conteúdo gerado, mostrar placeholder ou o conteúdo raw formatado */}
+                {meetingData.generatedContent ? (
+                    <div className="whitespace-pre-wrap text-justify">
+                        {meetingData.generatedContent}
+                    </div>
+                ) : (
+                    <div className="text-slate-400 italic text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                        {meetingData.rawContent ? (
+                            <p>Clique em "Gerar Ata Formal" para visualizar o documento final.</p>
+                        ) : (
+                            <p>Preencha os dados da reunião e as anotações acima para gerar a ata.</p>
+                        )}
+                    </div>
+                )}
+
+                {/* Assinaturas da Ata de Reunião */}
+                {meetingData.generatedContent && (
+                    <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm break-inside-avoid">
+                        <div className="col-span-2 w-2/3 mx-auto mt-8">
+                            <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.president || '____________________'}</div>
+                            <p>Presidente / Dirigente</p>
+                        </div>
+
+                        <div className="col-span-2 w-2/3 mx-auto mt-4">
+                            <div className="border-t border-black pt-2 mb-1 uppercase font-bold">{meetingData.secretary || '____________________'}</div>
+                            <p>Secretário(a)</p>
+                        </div>
+                    </div>
+                )}
             </div>
          )}
          
