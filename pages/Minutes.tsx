@@ -55,6 +55,7 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
   const [meetingData, setMeetingData] = useState({
     date: new Date().toISOString().split('T')[0],
     time: '19:30',
+    endTime: '21:00',
     type: 'Reunião Ordinária', // Ordinária, Extraordinária, Diretoria, Obreiros
     president: '',
     secretary: '',
@@ -103,9 +104,10 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
         Você é um secretário experiente de uma igreja evangélica Assembleia de Deus.
         Sua tarefa é transformar as anotações informais abaixo em uma Ata de Reunião formal, bem redigida e corrigida ortograficamente.
         
-        Detalres da Reunião:
+        Detalhes da Reunião:
         - Data: ${getLongDate(meetingData.date)}
-        - Horário: ${meetingData.time}
+        - Horário Início: ${meetingData.time}
+        - Horário Término: ${meetingData.endTime}
         - Tipo: ${meetingData.type}
         - Presidente: ${meetingData.president}
         - Secretário: ${meetingData.secretary}
@@ -115,10 +117,10 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
         "${meetingData.rawContent}"
 
         Instruções:
-        1. Escreva o texto corrido da ata, começando com a data e horário, quem presidiu, e narrando os fatos de forma formal e eclesiástica.
+        1. Escreva o texto corrido da ata, começando com a data e horário de início, quem presidiu, e narrando os fatos de forma formal e eclesiástica.
         2. Corrija qualquer erro de português.
         3. Use termos adequados ao ambiente de igreja (ex: "irmãos", "paz do Senhor", "deliberações").
-        4. Finalize com o encerramento padrão de uma ata ("Nada mais havendo a tratar...").
+        4. Finalize com o encerramento padrão de uma ata, mencionando o horário de término ("Nada mais havendo a tratar, encerrou-se a reunião às ${meetingData.endTime}...").
         5. NÃO inclua cabeçalhos (título da igreja) ou rodapés (assinaturas), pois isso já existe no layout do documento. Apenas o CORPO do texto.
       `;
 
@@ -384,9 +386,15 @@ const Minutes: React.FC<MinutesProps> = ({ currentSector, sectors }) => {
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Horário</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horário Início</label>
                 <input type="time" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
                   value={meetingData.time} onChange={e => setMeetingData({...meetingData, time: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horário Término</label>
+                <input type="time" className="w-full p-2 border rounded-lg focus:ring-emerald-500"
+                  value={meetingData.endTime} onChange={e => setMeetingData({...meetingData, endTime: e.target.value})} />
              </div>
 
              <div>
